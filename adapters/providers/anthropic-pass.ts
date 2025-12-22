@@ -18,6 +18,8 @@ type PassArgs = {
 export async function passThrough({ res, body, model, baseUrl, headers }: PassArgs) {
   const url = `${stripEndSlash(baseUrl)}/v1/messages`;
 
+  // Replace model with parsed model name (strips provider prefix like "glm:" or "anthropic:")
+  body.model = model;
   // Ensure stream is true for Claude Code UX
   body.stream = true;
 
