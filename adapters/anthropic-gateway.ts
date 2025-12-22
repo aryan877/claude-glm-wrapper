@@ -38,6 +38,9 @@ fastify.post("/v1/messages", async (req, res) => {
     const defaults = active ?? undefined;
     const { provider, model } = parseProviderModel(body.model, defaults);
 
+    // Log every request for debugging
+    console.log(`[ccx] REQUEST: model="${body.model}" → provider="${provider}" model="${model}"`);
+
     // Warn if using tools with providers that may not support them
     warnIfTools(body, provider);
 
