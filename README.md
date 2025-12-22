@@ -387,6 +387,33 @@ Use Claude Code's built-in `/model` command with provider prefixes:
 /model anthropic:claude-3-5-sonnet-20241022
 ```
 
+### Custom Model Shortcuts
+
+**Built-in shortcuts** make switching even faster! Instead of typing the full `provider:model-name`, use these aliases:
+
+| Shortcut | Expands To | Description |
+|----------|-----------|-------------|
+| `/model g` | `glm:glm-4.7` | Fastest way to GLM-4.7 |
+| `/model glm` | `glm:glm-4.7` | Friendly GLM shortcut |
+| `/model glm47` | `glm:glm-4.7` | Explicit version |
+| `/model glm45` | `glm:glm-4.5` | Previous version |
+| `/model flash` | `glm:glm-4-flash` | Fast model |
+
+**How it works**: This is **not** a Claude Code feature. The local proxy intercepts your `/model` request and expands shortcuts before routing. Claude Code just sends `"model": "g"` in the HTTP request, and the proxy translates it to `glm:glm-4.7`.
+
+**Adding your own shortcuts**: Edit `~/.claude-proxy/adapters/map.ts` and modify the `MODEL_SHORTCUTS` object:
+
+```typescript
+const MODEL_SHORTCUTS: Record<string, string> = {
+  "g": "glm:glm-4.7",
+  "o1": "openai:o1-preview",     // Add your own!
+  "fast": "glm:glm-4-flash",
+  // ... more shortcuts
+};
+```
+
+Then restart `ccx` to use your new shortcuts.
+
 ### ccx Workflows
 
 **Workflow 1: Compare Model Responses**

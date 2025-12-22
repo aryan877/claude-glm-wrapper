@@ -3,6 +3,16 @@ import { AnthropicMessage, AnthropicRequest, ProviderKey, ProviderModel } from "
 
 const PROVIDER_PREFIXES: ProviderKey[] = ["openai", "openrouter", "gemini", "glm", "anthropic"];
 
+// Model shortcuts - add your own aliases here
+const MODEL_SHORTCUTS: Record<string, string> = {
+  "g": "glm:glm-4.7",
+  "glm": "glm:glm-4.7",
+  "glm47": "glm:glm-4.7",
+  "glm45": "glm:glm-4.5",
+  "flash": "glm:glm-4-flash",
+  // Add more shortcuts as needed
+};
+
 /**
  * Parse provider and model from the model field
  * Supports formats: "provider:model" or "provider/model"
@@ -14,18 +24,21 @@ export function parseProviderModel(modelField: string, defaults?: ProviderModel)
     throw new Error("Missing 'model' in request");
   }
 
-  const sep = modelField.includes(":") ? ":" : modelField.includes("/") ? "/" : null;
+  // Expand shortcuts first
+  const expanded = MODEL_SHORTCUTS[modelField.toLowerCase()] || modelField;
+
+  const sep = expanded.includes(":") ? ":" : expanded.includes("/") ? "/" : null;
   if (!sep) {
     // no prefix: fall back to defaults or assume glm as legacy
-    return defaults ?? { provider: "glm", model: modelField };
+    return defaults ?? { provider: "glm", model: expanded };
   }
 
-  const [maybeProv, ...rest] = modelField.split(sep);
+  const [maybeProv, ...rest] = expanded.split(sep);
   const prov = maybeProv.toLowerCase() as ProviderKey;
 
   if (!PROVIDER_PREFIXES.includes(prov)) {
     // unrecognized prefix -> use defaults or treat full string as model
-    return defaults ?? { provider: "glm", model: modelField };
+    return defaults ?? { provider: "glm", model: expanded };
   }
 
   return { provider: prov, model: rest.join(sep) };
