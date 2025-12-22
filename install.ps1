@@ -213,18 +213,18 @@ Set-Alias ccf claude-glm-fast
     Write-Host "OK: Added aliases to PowerShell profile: $PROFILE"
 }
 
-# Create the GLM-4.6 wrapper
+# Create the GLM-4.7 wrapper
 function New-ClaudeGlmWrapper {
     $wrapperPath = Join-Path $UserBinDir "claude-glm.ps1"
 
     # Build wrapper content using array and join to avoid nested here-strings
     $wrapperContent = @(
-        '# Claude-GLM - Claude Code with Z.AI GLM-4.6 (Standard Model)',
+        '# Claude-GLM - Claude Code with Z.AI GLM-4.7 (Standard Model)',
         '',
         '# Set Z.AI environment variables',
         '$env:ANTHROPIC_BASE_URL = "https://api.z.ai/api/anthropic"',
         "`$env:ANTHROPIC_AUTH_TOKEN = `"$ZaiApiKey`"",
-        '$env:ANTHROPIC_MODEL = "glm-4.6"',
+        '$env:ANTHROPIC_MODEL = "glm-4.7"',
         '$env:ANTHROPIC_SMALL_FAST_MODEL = "glm-4.5-air"',
         '',
         '# Use custom config directory to avoid conflicts',
@@ -236,11 +236,11 @@ function New-ClaudeGlmWrapper {
         '}',
         '',
         '# Create/update settings file with GLM configuration',
-        '$settingsJson = "{`"env`":{`"ANTHROPIC_BASE_URL`":`"https://api.z.ai/api/anthropic`",`"ANTHROPIC_AUTH_TOKEN`":`"' + $ZaiApiKey + '`",`"ANTHROPIC_MODEL`":`"glm-4.6`",`"ANTHROPIC_SMALL_FAST_MODEL`":`"glm-4.5-air`"}}"',
+        '$settingsJson = "{`"env`":{`"ANTHROPIC_BASE_URL`":`"https://api.z.ai/api/anthropic`",`"ANTHROPIC_AUTH_TOKEN`":`"' + $ZaiApiKey + '`",`"ANTHROPIC_MODEL`":`"glm-4.7`",`"ANTHROPIC_SMALL_FAST_MODEL`":`"glm-4.5-air`"}}"',
         'Set-Content -Path (Join-Path $env:CLAUDE_HOME "settings.json") -Value $settingsJson',
         '',
         '# Launch Claude Code with custom config',
-        'Write-Host "LAUNCH: Starting Claude Code with GLM-4.6 (Standard Model)..."',
+        'Write-Host "LAUNCH: Starting Claude Code with GLM-4.7 (Standard Model)..."',
         'Write-Host "CONFIG: Config directory: $env:CLAUDE_HOME"',
         'Write-Host ""',
         '',
@@ -499,7 +499,7 @@ Write-Host "MODELS: Available model prefixes:"
 Write-Host "  openai:<model>      - OpenAI models (gpt-4o, gpt-4o-mini, etc.)"
 Write-Host "  openrouter:<model>  - OpenRouter models"
 Write-Host "  gemini:<model>      - Google Gemini models"
-Write-Host "  glm:<model>         - Z.AI GLM models (glm-4.6, glm-4.5, etc.)"
+Write-Host "  glm:<model>         - Z.AI GLM models (glm-4.7, glm-4.5, etc.)"
 Write-Host "  anthropic:<model>   - Anthropic Claude models"
 Write-Host ""
 Write-Host "TIP: Switch models in-session with: /model <prefix>:<model-name>"
@@ -871,7 +871,7 @@ function Install-ClaudeGlm {
     Write-Host "INFO: After reloading, you can use:"
     Write-Host ""
     Write-Host "Commands:"
-    Write-Host "   claude-glm      - GLM-4.6 (latest)"
+    Write-Host "   claude-glm      - GLM-4.7 (latest)"
     Write-Host "   claude-glm-4.5  - GLM-4.5"
     Write-Host "   claude-glm-fast - GLM-4.5-Air (fast)"
     if ($ccxInstalled) {
@@ -880,7 +880,7 @@ function Install-ClaudeGlm {
     Write-Host ""
     Write-Host "Aliases:"
     Write-Host "   cc    - claude (regular Claude)"
-    Write-Host "   ccg   - claude-glm (GLM-4.6)"
+    Write-Host "   ccg   - claude-glm (GLM-4.7)"
     Write-Host "   ccg45 - claude-glm-4.5 (GLM-4.5)"
     Write-Host "   ccf   - claude-glm-fast"
     if ($ccxInstalled) {

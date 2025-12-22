@@ -10,6 +10,11 @@
 const isNpxInstall = process.env.npm_execpath && process.env.npm_execpath.includes('npx');
 const isTempInstall = process.env.npm_config_cache && process.cwd().includes('_npx');
 
+// Allow local development
+const isLocalDev = process.cwd().includes('claude-glm-wrapper') ||
+                   process.env.CLAUDE_GLM_DEV === 'true';
+if (isLocalDev) process.exit(0);
+
 // Block ALL installation attempts (local and global)
 if (!isNpxInstall && !isTempInstall) {
   console.error('\n❌ ERROR: Incorrect installation method!\n');
