@@ -39,7 +39,10 @@ fastify.post("/v1/messages", async (req, res) => {
     const { provider, model } = parseProviderModel(body.model, defaults);
 
     // Log every request for debugging
-    console.log(`[ccx] REQUEST: model="${body.model}" → provider="${provider}" model="${model}"`);
+    const tools = body.tools?.map((t: any) => t.name).join(",") || "none";
+    const hasSystem = !!body.system;
+    const msgCount = body.messages?.length || 0;
+    console.log(`[ccx] REQUEST: model="${body.model}" → provider="${provider}" model="${model}" | tools=[${tools}] system=${hasSystem} messages=${msgCount}`);
 
     // Warn if using tools with providers that may not support them
     warnIfTools(body, provider);
