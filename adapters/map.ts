@@ -5,11 +5,16 @@ const PROVIDER_PREFIXES: ProviderKey[] = ["openai", "openrouter", "gemini", "glm
 
 // Model shortcuts - add your own aliases here
 const MODEL_SHORTCUTS: Record<string, string> = {
+  // GLM shortcuts
   "g": "glm:glm-4.7",
   "glm": "glm:glm-4.7",
   "glm47": "glm:glm-4.7",
   "glm45": "glm:glm-4.5",
   "flash": "glm:glm-4-flash",
+  // Claude shortcuts (for API users)
+  "opus": "anthropic:claude-opus-4-5-20251101",
+  "sonnet": "anthropic:claude-sonnet-4-5-20250929",
+  "haiku": "anthropic:claude-haiku-4-5-20251001",
   // Add more shortcuts as needed
 };
 
@@ -26,6 +31,11 @@ export function parseProviderModel(modelField: string, defaults?: ProviderModel)
 
   // Expand shortcuts first
   const expanded = MODEL_SHORTCUTS[modelField.toLowerCase()] || modelField;
+
+  // Auto-detect Claude models (start with "claude-") and route to anthropic
+  if (expanded.toLowerCase().startsWith("claude-")) {
+    return { provider: "anthropic", model: expanded };
+  }
 
   const sep = expanded.includes(":") ? ":" : expanded.includes("/") ? "/" : null;
   if (!sep) {

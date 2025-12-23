@@ -398,6 +398,11 @@ Use Claude Code's built-in `/model` command with provider prefixes:
 | `/model glm47` | `glm:glm-4.7` | Explicit version |
 | `/model glm45` | `glm:glm-4.5` | Previous version |
 | `/model flash` | `glm:glm-4-flash` | Fast model |
+| `/model opus` | `anthropic:claude-opus-4-5-20251101` | Claude Opus (API key required) |
+| `/model sonnet` | `anthropic:claude-sonnet-4-5-20250929` | Claude Sonnet (API key required) |
+| `/model haiku` | `anthropic:claude-haiku-4-5-20251001` | Claude Haiku (API key required) |
+
+**Note:** Claude shortcuts require `ANTHROPIC_API_KEY` in your `.env` file. Models starting with `claude-` are auto-detected and routed to Anthropic.
 
 **How it works**: This is **not** a Claude Code feature. The local proxy intercepts your `/model` request and expands shortcuts before routing. Claude Code just sends `"model": "g"` in the HTTP request, and the proxy translates it to `glm:glm-4.7`.
 
