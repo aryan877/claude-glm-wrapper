@@ -12,59 +12,40 @@ Switch freely between multiple AI providers: GLM, OpenAI, Gemini, OpenRouter, an
 **🔀 In-session switching**: With ccx, switch models without restarting
 **🎯 Perfect for**: Development, testing, or when you want model flexibility
 
+> **Note:** This is a fork of [JoeInnsp23/claude-glm-wrapper](https://github.com/JoeInnsp23/claude-glm-wrapper) with additional features (multi-provider proxy, dangerously-skip-permissions shortcuts, etc.) that haven't been merged upstream. The `npx claude-glm-installer` command installs from the **original** repo and won't include these features. **Use the local clone method below to get the full version.**
+
 ## Quick Start
 
-### Universal Installation (All Platforms)
-
-**One command works everywhere - Windows, macOS, and Linux:**
+### Installation (Clone from this fork)
 
 ```bash
-npx claude-glm-installer
+# macOS / Linux
+git clone https://github.com/aryan877/claude-glm-wrapper.git
+cd claude-glm-wrapper
+bash install.sh
+source ~/.zshrc  # or ~/.bashrc
 ```
 
-Then activate (platform-specific):
-```bash
-# macOS / Linux:
-source ~/.zshrc  # or ~/.bashrc
-
-# Windows PowerShell:
+```powershell
+# Windows (PowerShell)
+git clone https://github.com/aryan877/claude-glm-wrapper.git
+cd claude-glm-wrapper
+.\install.ps1
 . $PROFILE
 ```
 
-### Start Using GLM Models
+### Start Using
 
-**All Platforms:**
 ```bash
 ccg              # Claude Code with GLM-4.7 (latest)
 ccg45            # Claude Code with GLM-4.5
 ccf              # Claude Code with GLM-4.5-Air (faster)
 cc               # Regular Claude Code
+claude-d         # Claude with --dangerously-skip-permissions
+claude-glm-d     # GLM with --dangerously-skip-permissions
 ```
 
-That's it! 🎉
-
----
-
-### Alternative: Platform-Specific Installers
-
-<details>
-<summary>Click to expand platform-specific installation methods</summary>
-
-#### macOS / Linux
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/JoeInnsp23/claude-glm-wrapper/main/install.sh)
-source ~/.zshrc  # or ~/.bashrc
-```
-
-#### Windows (PowerShell)
-
-```powershell
-iwr -useb https://raw.githubusercontent.com/JoeInnsp23/claude-glm-wrapper/main/install.ps1 | iex
-. $PROFILE
-```
-
-</details>
+That's it!
 
 ## Features
 
@@ -81,79 +62,47 @@ iwr -useb https://raw.githubusercontent.com/JoeInnsp23/claude-glm-wrapper/main/i
 2. **Claude Code**: Install from [anthropic.com/claude-code](https://www.anthropic.com/claude-code)
 3. **Z.AI API Key**: Get your free key from [z.ai/manage-apikey/apikey-list](https://z.ai/manage-apikey/apikey-list)
 
-*Note: If you don't have Node.js, you can use the platform-specific installers (see Quick Start above)*
+_Note: If you don't have Node.js, you can use the platform-specific installers (see Quick Start above)_
 
 ## Installation
 
-### Method 1: npx (Recommended - All Platforms)
+### Method 1: Local Clone (Recommended)
 
-**One command for Windows, macOS, and Linux:**
+Clone this fork to get all features including multi-provider proxy and dangerously-skip-permissions shortcuts:
 
-```bash
-npx claude-glm-installer
-```
-
-The installer will:
-- Auto-detect your operating system
-- Check if Claude Code is installed
-- Ask for your Z.AI API key
-- Create platform-appropriate wrapper scripts
-- Add convenient aliases to your shell/profile
-
-After installation, **activate the changes**:
+#### macOS / Linux
 
 ```bash
-# macOS / Linux:
-source ~/.zshrc  # or ~/.bashrc
-
-# Windows PowerShell:
-. $PROFILE
-```
-
-### Method 2: Platform-Specific Installers
-
-<details>
-<summary>macOS / Linux</summary>
-
-**One-Line Install:**
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/JoeInnsp23/claude-glm-wrapper/main/install.sh)
-source ~/.zshrc  # or ~/.bashrc
-```
-
-**Clone and Install:**
-```bash
-git clone https://github.com/JoeInnsp23/claude-glm-wrapper.git
+git clone https://github.com/aryan877/claude-glm-wrapper.git
 cd claude-glm-wrapper
 bash install.sh
-source ~/.zshrc
+source ~/.zshrc  # or ~/.bashrc
 ```
 
-</details>
+#### Windows (PowerShell)
 
-<details>
-<summary>Windows (PowerShell)</summary>
-
-**One-Line Install:**
 ```powershell
-iwr -useb https://raw.githubusercontent.com/JoeInnsp23/claude-glm-wrapper/main/install.ps1 | iex
-. $PROFILE
-```
-
-**Clone and Install:**
-```powershell
-git clone https://github.com/JoeInnsp23/claude-glm-wrapper.git
+git clone https://github.com/aryan877/claude-glm-wrapper.git
 cd claude-glm-wrapper
 .\install.ps1
 . $PROFILE
 ```
 
-**Note:** If you get an execution policy error, run:
-```powershell
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+The installer will:
+
+- Check if Claude Code is installed
+- Ask for your Z.AI API key
+- Create wrapper scripts in `~/.local/bin/`
+- Add aliases (`cc`, `ccg`, `ccf`, `claude-d`, `claude-glm-d`, etc.) to your shell config
+- Optionally install `ccx` multi-provider proxy
+
+### Method 2: npx
+
+```bash
+npx claude-glm
 ```
 
-</details>
+This downloads and runs the installer directly from npm — no cloning needed.
 
 ## Usage
 
@@ -161,19 +110,22 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
 The installer creates these commands and aliases:
 
-| Alias | Full Command | What It Does | When to Use |
-|-------|--------------|--------------|-------------|
-| `cc` | `claude` | Regular Claude Code | Default - your normal Claude setup |
-| `ccg` | `claude-glm` | GLM-4.7 (latest) | Best quality GLM model |
-| `ccg45` | `claude-glm-4.5` | GLM-4.5 | Previous version of GLM |
-| `ccf` | `claude-glm-fast` | GLM-4.5-Air (fast) | Quicker responses, lower cost |
-| `ccx` | `ccx` | Multi-provider proxy | Switch between providers in-session |
+| Alias          | Full Command                                | What It Does                      | When to Use                            |
+| -------------- | ------------------------------------------- | --------------------------------- | -------------------------------------- |
+| `cc`           | `claude`                                    | Regular Claude Code               | Default - your normal Claude setup     |
+| `ccg`          | `claude-glm`                                | GLM-4.7 (latest)                  | Best quality GLM model                 |
+| `ccg45`        | `claude-glm-4.5`                            | GLM-4.5                           | Previous version of GLM                |
+| `ccf`          | `claude-glm-fast`                           | GLM-4.5-Air (fast)                | Quicker responses, lower cost          |
+| `ccx`          | `ccx`                                       | Multi-provider proxy              | Switch between providers in-session    |
+| `claude-d`     | `claude --dangerously-skip-permissions`     | Claude without permission prompts | Autonomous mode (use with caution)     |
+| `claude-glm-d` | `claude-glm --dangerously-skip-permissions` | GLM without permission prompts    | Autonomous GLM mode (use with caution) |
 
 **💡 Tip**: Use the short aliases! They're faster to type and easier to remember.
 
 **🆕 New: ccx Multi-Provider Proxy**
 
 The `ccx` command starts a local proxy that lets you switch between multiple AI providers in a single session:
+
 - **OpenAI**: GPT-4o, GPT-4o-mini, and more
 - **OpenRouter**: Access to hundreds of models
 - **Google Gemini**: Gemini 1.5 Pro and Flash
@@ -185,6 +137,7 @@ Switch models mid-session using `/model <provider>:<model-name>`. Perfect for co
 ### How It Works
 
 Each command starts a **separate Claude Code session** with different configurations:
+
 - `ccg`, `ccg45`, and `ccf` use Z.AI's API with your Z.AI key
 - `cc` uses Anthropic's API with your Anthropic key (default Claude setup)
 - Your configurations **never conflict** — they're stored in separate directories
@@ -254,30 +207,35 @@ The proxy reads the `model` field and routes to the right provider. Switch model
 ### Basic Examples
 
 **Start a coding session with the latest GLM:**
+
 ```bash
 ccg
 # Opens Claude Code using GLM-4.7
 ```
 
 **Use GLM-4.5:**
+
 ```bash
 ccg45
 # Opens Claude Code using GLM-4.5
 ```
 
 **Need faster responses? Use the fast model:**
+
 ```bash
 ccf
 # Opens Claude Code using GLM-4.5-Air
 ```
 
 **Use regular Claude:**
+
 ```bash
 cc
 # Opens Claude Code with Anthropic models (your default setup)
 ```
 
 **Pass arguments like normal:**
+
 ```bash
 ccg --help
 ccg "refactor this function"
@@ -287,6 +245,7 @@ ccf "quick question about Python"
 ## Common Workflows
 
 ### Workflow 1: Testing with GLM, Production with Claude
+
 ```bash
 # Develop and test with cost-effective GLM-4.7
 ccg
@@ -299,6 +258,7 @@ cc
 ```
 
 ### Workflow 2: Quick Questions with Fast Model
+
 ```bash
 # Quick syntax questions
 ccf "how do I use async/await in Python?"
@@ -309,6 +269,7 @@ ccg
 ```
 
 ### Workflow 3: Multiple Projects
+
 ```bash
 # Project 1: Use GLM to save costs
 cd ~/project1
@@ -391,16 +352,16 @@ Use Claude Code's built-in `/model` command with provider prefixes:
 
 **Built-in shortcuts** make switching even faster! Instead of typing the full `provider:model-name`, use these aliases:
 
-| Shortcut | Expands To | Description |
-|----------|-----------|-------------|
-| `/model g` | `glm:glm-4.7` | Fastest way to GLM-4.7 |
-| `/model glm` | `glm:glm-4.7` | Friendly GLM shortcut |
-| `/model glm47` | `glm:glm-4.7` | Explicit version |
-| `/model glm45` | `glm:glm-4.5` | Previous version |
-| `/model flash` | `glm:glm-4-flash` | Fast model |
-| `/model opus` | `anthropic:claude-opus-4-5-20251101` | Claude Opus (API key required) |
+| Shortcut        | Expands To                             | Description                      |
+| --------------- | -------------------------------------- | -------------------------------- |
+| `/model g`      | `glm:glm-4.7`                          | Fastest way to GLM-4.7           |
+| `/model glm`    | `glm:glm-4.7`                          | Friendly GLM shortcut            |
+| `/model glm47`  | `glm:glm-4.7`                          | Explicit version                 |
+| `/model glm45`  | `glm:glm-4.5`                          | Previous version                 |
+| `/model flash`  | `glm:glm-4-flash`                      | Fast model                       |
+| `/model opus`   | `anthropic:claude-opus-4-5-20251101`   | Claude Opus (API key required)   |
 | `/model sonnet` | `anthropic:claude-sonnet-4-5-20250929` | Claude Sonnet (API key required) |
-| `/model haiku` | `anthropic:claude-haiku-4-5-20251001` | Claude Haiku (API key required) |
+| `/model haiku`  | `anthropic:claude-haiku-4-5-20251001`  | Claude Haiku (API key required)  |
 
 **Note:** Claude shortcuts require `ANTHROPIC_API_KEY` in your `.env` file. Models starting with `claude-` are auto-detected and routed to Anthropic.
 
@@ -410,9 +371,9 @@ Use Claude Code's built-in `/model` command with provider prefixes:
 
 ```typescript
 const MODEL_SHORTCUTS: Record<string, string> = {
-  "g": "glm:glm-4.7",
-  "o1": "openai:o1-preview",     // Add your own!
-  "fast": "glm:glm-4-flash",
+  g: "glm:glm-4.7",
+  o1: "openai:o1-preview", // Add your own!
+  fast: "glm:glm-4-flash",
   // ... more shortcuts
 };
 ```
@@ -422,6 +383,7 @@ Then restart `ccx` to use your new shortcuts.
 ### ccx Workflows
 
 **Workflow 1: Compare Model Responses**
+
 ```bash
 ccx
 # Ask a question
@@ -432,6 +394,7 @@ ccx
 ```
 
 **Workflow 2: Cost Optimization**
+
 ```bash
 ccx
 # Start with a fast, cheap model for exploration
@@ -442,6 +405,7 @@ ccx
 ```
 
 **Workflow 3: Leverage Model Strengths**
+
 ```bash
 ccx
 # Use GPT-4 for coding
@@ -462,13 +426,13 @@ ccx
 
 ### ccx vs Dedicated Wrappers
 
-| Feature | ccx | ccg/ccg45/ccf |
-|---------|-----|---------------|
-| Switch models in-session | ✅ Yes | ❌ No |
-| Multiple providers | ✅ Yes | ❌ GLM only |
-| Separate chat history | ❌ No | ✅ Yes |
-| Simple setup | ✅ .env file | ✅ Installer |
-| Overhead | Proxy startup | None |
+| Feature                  | ccx           | ccg/ccg45/ccf |
+| ------------------------ | ------------- | ------------- |
+| Switch models in-session | ✅ Yes        | ❌ No         |
+| Multiple providers       | ✅ Yes        | ❌ GLM only   |
+| Separate chat history    | ❌ No         | ✅ Yes        |
+| Simple setup             | ✅ .env file  | ✅ Installer  |
+| Overhead                 | Proxy startup | None          |
 
 **Use ccx when**: You want flexibility and in-session switching
 **Use dedicated wrappers when**: You want separate histories for different models
@@ -496,6 +460,7 @@ Each wrapper uses its own configuration directory to prevent conflicts:
 | `claude` | `%USERPROFILE%\.claude\` (default) | Your original Claude setup |
 
 **This means:**
+
 - ✅ Your original Claude settings are **never touched**
 - ✅ Chat histories stay separate for each model
 - ✅ API keys are isolated — no mixing!
@@ -503,11 +468,13 @@ Each wrapper uses its own configuration directory to prevent conflicts:
 ### Wrapper Scripts Location
 
 **macOS / Linux:** `~/.local/bin/`
+
 - `claude-glm` (GLM-4.7)
 - `claude-glm-4.5` (GLM-4.5)
 - `claude-glm-fast` (GLM-4.5-Air)
 
 **Windows:** `%USERPROFILE%\.local\bin\`
+
 - `claude-glm.ps1` (GLM-4.7)
 - `claude-glm-4.5.ps1` (GLM-4.5)
 - `claude-glm-fast.ps1` (GLM-4.5-Air)
@@ -519,12 +486,14 @@ These are just tiny wrapper scripts (bash or PowerShell) that set the right envi
 ### macOS / Linux
 
 **Option 1: Use the Installer**
+
 ```bash
 cd claude-glm-wrapper && bash install.sh
 # Choose option "1) Update API key only"
 ```
 
 **Option 2: Edit Manually**
+
 ```bash
 nano ~/.local/bin/claude-glm
 nano ~/.local/bin/claude-glm-4.5
@@ -535,6 +504,7 @@ nano ~/.local/bin/claude-glm-fast
 ### Windows (PowerShell)
 
 **Option 1: Use the Installer**
+
 ```powershell
 cd claude-glm-wrapper
 .\install.ps1
@@ -542,6 +512,7 @@ cd claude-glm-wrapper
 ```
 
 **Option 2: Edit Manually**
+
 ```powershell
 notepad "$env:USERPROFILE\.local\bin\claude-glm.ps1"
 notepad "$env:USERPROFILE\.local\bin\claude-glm-4.5.ps1"
@@ -553,12 +524,12 @@ notepad "$env:USERPROFILE\.local\bin\claude-glm-fast.ps1"
 
 The wrapper scripts work by setting environment variables before launching Claude Code:
 
-| Environment Variable | What It Does |
-|---------------------|--------------|
-| `ANTHROPIC_BASE_URL` | Points to Z.AI's API endpoint |
-| `ANTHROPIC_AUTH_TOKEN` | Your Z.AI API key |
-| `ANTHROPIC_MODEL` | Which model to use (glm-4.5 or glm-4.5-air) |
-| `CLAUDE_HOME` | Where to store config files |
+| Environment Variable   | What It Does                                |
+| ---------------------- | ------------------------------------------- |
+| `ANTHROPIC_BASE_URL`   | Points to Z.AI's API endpoint               |
+| `ANTHROPIC_AUTH_TOKEN` | Your Z.AI API key                           |
+| `ANTHROPIC_MODEL`      | Which model to use (glm-4.5 or glm-4.5-air) |
+| `CLAUDE_HOME`          | Where to store config files                 |
 
 Claude Code reads these variables and uses them instead of the defaults. Simple! 🎯
 
@@ -569,6 +540,7 @@ Claude Code reads these variables and uses them instead of the defaults. Simple!
 **Problem**: Claude Code isn't installed or not in your PATH.
 
 **Solutions**:
+
 1. Install Claude Code from [anthropic.com/claude-code](https://www.anthropic.com/claude-code)
 2. Or add Claude to your PATH if it's installed elsewhere
 
@@ -579,6 +551,7 @@ Claude Code reads these variables and uses them instead of the defaults. Simple!
 **Problem**: You didn't source your shell config after installation.
 
 **Solution**: Run the source command the installer showed you:
+
 ```bash
 source ~/.zshrc  # or ~/.bashrc
 ```
@@ -590,11 +563,13 @@ source ~/.zshrc  # or ~/.bashrc
 **Problem**: API key issues.
 
 **Solutions for ccg/ccf/ccg45**:
+
 1. **Check your key**: Visit [z.ai/manage-apikey/apikey-list](https://z.ai/manage-apikey/apikey-list)
 2. **Verify credits**: Make sure your Z.AI account has available credits
 3. **Update the key**: Run `bash install.sh` and choose "Update API key only"
 
 **Solutions for ccx**:
+
 1. **Check your .env file**: Edit `~/.claude-proxy/.env`
 2. **Verify keys are set**: Make sure the API keys for the providers you're using are filled in
 3. **No empty values**: If you're not using a provider, either leave it blank or remove the line
@@ -605,6 +580,7 @@ source ~/.zshrc  # or ~/.bashrc
 **Problem**: Proxy fails to start or times out.
 
 **Solutions**:
+
 1. **Check logs**: Look at `/tmp/claude-proxy.log` (Unix) or `%TEMP%\claude-proxy.log` (Windows)
 2. **Port in use**: Another process might be using port 17870. Set `CLAUDE_PROXY_PORT=17871` in .env
 3. **Missing dependencies**: Run `npm install -g tsx` to ensure TypeScript runner is available
@@ -615,6 +591,7 @@ source ~/.zshrc  # or ~/.bashrc
 **Problem**: `/model` command doesn't seem to work.
 
 **Solutions**:
+
 1. **Check provider prefix**: Use format `/model provider:model-name` (e.g., `/model openai:gpt-4o`)
 2. **Verify API key**: Make sure the provider's API key is set in `~/.claude-proxy/.env`
 3. **Check proxy logs**: Look for errors in `/tmp/claude-proxy.log`
@@ -624,6 +601,7 @@ source ~/.zshrc  # or ~/.bashrc
 **Problem**: Using `ccg` but it's using the wrong API.
 
 **Solution**: Each command is independent. Make sure you:
+
 - Exit any running Claude Code session
 - Start fresh with the command you want (`ccg`, `ccg45`, `ccf`, or `cc`)
 
@@ -634,6 +612,7 @@ source ~/.zshrc  # or ~/.bashrc
 **Problem**: PowerShell execution policy prevents running scripts.
 
 **Solution**:
+
 ```powershell
 Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ```
@@ -643,6 +622,7 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 **Problem**: PowerShell profile wasn't reloaded after installation.
 
 **Solutions**:
+
 1. Reload profile: `. $PROFILE`
 2. Or restart PowerShell
 3. Or run the full command: `claude-glm`
@@ -664,6 +644,7 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ### macOS / Linux
 
 **Remove wrapper scripts:**
+
 ```bash
 rm ~/.local/bin/claude-glm
 rm ~/.local/bin/claude-glm-4.5
@@ -671,6 +652,7 @@ rm ~/.local/bin/claude-glm-fast
 ```
 
 **Remove config directories** (optional - deletes chat history):
+
 ```bash
 rm -rf ~/.claude-glm
 rm -rf ~/.claude-glm-45
@@ -678,6 +660,7 @@ rm -rf ~/.claude-glm-fast
 ```
 
 **Remove aliases** from `~/.zshrc` or `~/.bashrc`:
+
 ```bash
 # Delete these lines:
 # Claude Code Model Switcher Aliases
@@ -685,6 +668,8 @@ alias cc='claude'
 alias ccg='claude-glm'
 alias ccg45='claude-glm-4.5'
 alias ccf='claude-glm-fast'
+alias claude-d='claude --dangerously-skip-permissions'
+alias claude-glm-d='claude-glm --dangerously-skip-permissions'
 ```
 
 Then run: `source ~/.zshrc`
@@ -692,6 +677,7 @@ Then run: `source ~/.zshrc`
 ### Windows (PowerShell)
 
 **Remove wrapper scripts:**
+
 ```powershell
 Remove-Item "$env:USERPROFILE\.local\bin\claude-glm.ps1"
 Remove-Item "$env:USERPROFILE\.local\bin\claude-glm-4.5.ps1"
@@ -699,6 +685,7 @@ Remove-Item "$env:USERPROFILE\.local\bin\claude-glm-fast.ps1"
 ```
 
 **Remove config directories** (optional - deletes chat history):
+
 ```powershell
 Remove-Item -Recurse "$env:USERPROFILE\.claude-glm"
 Remove-Item -Recurse "$env:USERPROFILE\.claude-glm-45"
@@ -706,6 +693,7 @@ Remove-Item -Recurse "$env:USERPROFILE\.claude-glm-fast"
 ```
 
 **Remove aliases** from PowerShell profile:
+
 ```powershell
 notepad $PROFILE
 # Delete these lines:
@@ -721,18 +709,24 @@ Then reload: `. $PROFILE`
 ## FAQ
 
 ### Q: Will this affect my existing Claude Code setup?
+
 **A**: No! Your regular Claude Code setup is completely untouched. The wrappers use separate config directories.
 
 ### Q: Can I use both GLM and Claude in the same project?
+
 **A**: Yes! Just use `ccg` for GLM sessions and `cc` for Claude sessions. Each maintains its own chat history. Or use `ccx` to switch between providers in a single session.
 
 ### Q: Which should I use: ccx or dedicated wrappers (ccg/ccf)?
+
 **A**:
+
 - **Use ccx** if you want to switch between multiple providers (OpenAI, Gemini, OpenRouter, GLM, Anthropic) in the same session
 - **Use dedicated wrappers** if you want separate chat histories for different models/providers
 
 ### Q: Which model should I use?
+
 **A**:
+
 - Use **`ccx`** for: Maximum flexibility, model comparison, leveraging different model strengths
 - Use **`ccg` (GLM-4.7)** for: Latest model, complex coding, refactoring, detailed explanations
 - Use **`ccg45` (GLM-4.5)** for: Previous version, if you need consistency with older projects
@@ -740,21 +734,27 @@ Then reload: `. $PROFILE`
 - Use **`cc` (Claude)** for: Your regular Anthropic Claude setup
 
 ### Q: How do I switch models in ccx?
+
 **A**: Use the `/model` command with the format `<provider>:<model-name>`. For example:
+
 - `/model openai:gpt-4o`
 - `/model gemini:gemini-1.5-pro`
 - `/model glm:glm-4.7`
 
 ### Q: Is this secure?
+
 **A**: Yes! Your API keys are stored locally on your machine in wrapper scripts (bash or PowerShell, depending on your OS). Keep your scripts directory secure with appropriate permissions.
 
 ### Q: Does this work on Windows?
+
 **A**: Yes! Use the PowerShell installer (install.ps1). Windows, macOS, and Linux are all fully supported.
 
 ### Q: Can I use a different Z.AI model?
+
 **A**: Yes! Edit the wrapper scripts in `~/.local/bin/` and change the `ANTHROPIC_MODEL` variable to any model Z.AI supports.
 
 ### Q: What happens if I run out of Z.AI credits?
+
 **A**: The GLM commands will fail with an API error. Just switch to regular Claude using `cc` until you add more credits.
 
 ## Contributing

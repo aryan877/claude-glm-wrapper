@@ -701,7 +701,9 @@ create_shell_aliases() {
         grep -v "alias cc=" | \
         grep -v "alias ccg=" | \
         grep -v "alias ccg45=" | \
-        grep -v "alias ccf=" > "$rc_file.tmp"
+        grep -v "alias ccf=" | \
+        grep -v "alias claude-d=" | \
+        grep -v "alias claude-glm-d=" > "$rc_file.tmp"
         mv "$rc_file.tmp" "$rc_file"
     fi
     
@@ -714,6 +716,8 @@ alias cc 'claude'
 alias ccg 'claude-glm'
 alias ccg45 'claude-glm-4.5'
 alias ccf 'claude-glm-fast'
+alias claude-d 'claude --dangerously-skip-permissions'
+alias claude-glm-d 'claude-glm --dangerously-skip-permissions'
 EOF
     else
         cat >> "$rc_file" << 'EOF'
@@ -723,6 +727,8 @@ alias cc='claude'
 alias ccg='claude-glm'
 alias ccg45='claude-glm-4.5'
 alias ccf='claude-glm-fast'
+alias claude-d='claude --dangerously-skip-permissions'
+alias claude-glm-d='claude-glm --dangerously-skip-permissions'
 EOF
     fi
     
@@ -868,10 +874,12 @@ main() {
     fi
     echo ""
     echo "Aliases:"
-    echo "   cc    - claude (regular Claude)"
-    echo "   ccg   - claude-glm (GLM-4.7)"
-    echo "   ccg45 - claude-glm-4.5 (GLM-4.5)"
-    echo "   ccf   - claude-glm-fast"
+    echo "   cc          - claude (regular Claude)"
+    echo "   ccg         - claude-glm (GLM-4.7)"
+    echo "   ccg45       - claude-glm-4.5 (GLM-4.5)"
+    echo "   ccf         - claude-glm-fast"
+    echo "   claude-d    - claude --dangerously-skip-permissions"
+    echo "   claude-glm-d - claude-glm --dangerously-skip-permissions"
     if [ "$install_ccx_choice" != "n" ] && [ "$install_ccx_choice" != "N" ]; then
         echo "   ccx   - Multi-provider proxy"
     fi

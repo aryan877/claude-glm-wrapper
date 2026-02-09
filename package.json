@@ -1,7 +1,7 @@
 {
-  "name": "claude-glm-installer",
-  "version": "2.1.0",
-  "description": "Cross-platform installer for Claude Code with Z.AI GLM models and multi-provider proxy. Run with: npx claude-glm-installer",
+  "name": "claude-glm",
+  "version": "1.0.0",
+  "description": "Cross-platform installer for Claude Code with Z.AI GLM models, multi-provider proxy, and dangerously-skip-permissions shortcuts. Run with: npx claude-glm",
   "keywords": [
     "claude",
     "claude-code",
@@ -15,19 +15,19 @@
     "installer",
     "proxy"
   ],
-  "homepage": "https://github.com/JoeInnsp23/claude-glm-wrapper#readme",
+  "homepage": "https://github.com/aryan877/claude-glm-wrapper#readme",
   "bugs": {
-    "url": "https://github.com/JoeInnsp23/claude-glm-wrapper/issues"
+    "url": "https://github.com/aryan877/claude-glm-wrapper/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/JoeInnsp23/claude-glm-wrapper.git"
+    "url": "git+https://github.com/aryan877/claude-glm-wrapper.git"
   },
   "license": "MIT",
-  "author": "Joseph Stephenson-Mouzo",
+  "author": "aryan877",
   "type": "module",
   "bin": {
-    "claude-glm-installer": "bin/cli.js"
+    "claude-glm": "bin/cli.js"
   },
   "files": [
     "bin/",
