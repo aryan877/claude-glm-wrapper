@@ -12,11 +12,19 @@ Switch freely between multiple AI providers: GLM, OpenAI, Gemini, OpenRouter, an
 **🔀 In-session switching**: With ccx, switch models without restarting
 **🎯 Perfect for**: Development, testing, or when you want model flexibility
 
-> **Note:** This is a fork of [JoeInnsp23/claude-glm-wrapper](https://github.com/JoeInnsp23/claude-glm-wrapper) with additional features (multi-provider proxy, dangerously-skip-permissions shortcuts, etc.) that haven't been merged upstream. The `npx claude-glm-installer` command installs from the **original** repo and won't include these features. **Use the local clone method below to get the full version.**
-
 ## Quick Start
 
-### Installation (Clone from this fork)
+### Installation (npx - Recommended)
+
+**One command, no cloning required:**
+
+```bash
+npx claude-glm
+```
+
+This downloads the latest version and runs the installer directly.
+
+### Installation (Clone from GitHub)
 
 ```bash
 # macOS / Linux
@@ -66,9 +74,34 @@ _Note: If you don't have Node.js, you can use the platform-specific installers (
 
 ## Installation
 
-### Method 1: Local Clone (Recommended)
+### Method 1: npx (Recommended - No Clone Required)
 
-Clone this fork to get all features including multi-provider proxy and dangerously-skip-permissions shortcuts:
+```bash
+npx claude-glm
+```
+
+This downloads the installer from npm and runs it directly. No git clone needed.
+
+The installer will:
+- Check if Claude Code is installed
+- Ask for your Z.AI API key
+- Create wrapper scripts in `~/.local/bin/`
+- Add aliases (`cc`, `ccg`, `ccf`, `claude-d`, `claude-glm-d`, etc.) to your shell config
+- Optionally install `ccx` multi-provider proxy
+
+After installation, **activate the changes**:
+
+```bash
+# macOS / Linux:
+source ~/.zshrc  # or ~/.bashrc
+
+# Windows PowerShell:
+. $PROFILE
+```
+
+### Method 2: Clone from GitHub
+
+If you prefer to clone the repository or want to modify the code:
 
 #### macOS / Linux
 
@@ -87,22 +120,6 @@ cd claude-glm-wrapper
 .\install.ps1
 . $PROFILE
 ```
-
-The installer will:
-
-- Check if Claude Code is installed
-- Ask for your Z.AI API key
-- Create wrapper scripts in `~/.local/bin/`
-- Add aliases (`cc`, `ccg`, `ccf`, `claude-d`, `claude-glm-d`, etc.) to your shell config
-- Optionally install `ccx` multi-provider proxy
-
-### Method 2: npx
-
-```bash
-npx claude-glm
-```
-
-This downloads and runs the installer directly from npm — no cloning needed.
 
 ## Usage
 

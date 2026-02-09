@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ENV_FILE="$HOME/.claude-proxy/.env"
+ROOT_DIR="$HOME/.claude-proxy"
+ENV_FILE="$ROOT_DIR/.env"
 PORT="${CLAUDE_PROXY_PORT:-17870}"
 
 # Check if --setup flag is provided
