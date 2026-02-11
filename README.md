@@ -58,7 +58,7 @@ That's it!
 ## Features
 
 - 🚀 **Easy switching** between GLM and Claude models
-- ⚡ **Multiple GLM models**: GLM-4.7 (latest), GLM-4.5, and GLM-4.5-Air (fast)
+- ⚡ **Multiple GLM models**: GLM-5 (latest), GLM-4.7, GLM-4.5, and GLM-4.5-Air (fast)
 - 🔒 **No sudo/admin required**: Installs to user's home directory
 - 🖥️ **Cross-platform**: Works on Windows, macOS, and Linux
 - 📁 **Isolated configs**: Each model uses its own config directory — no conflicts!
@@ -144,9 +144,9 @@ The installer creates these commands and aliases:
 The `ccx` command starts a local proxy that lets you switch between multiple AI providers in a single session:
 
 - **OpenAI**: GPT-4o, GPT-4o-mini, and more
-- **OpenRouter**: Access to hundreds of models
+- **OpenRouter**: Access to hundreds of models (including GLM-5)
 - **Google Gemini**: Gemini 1.5 Pro and Flash
-- **Z.AI GLM**: GLM-4.7, GLM-4.5, GLM-4.5-Air
+- **Z.AI GLM**: GLM-5, GLM-4.7, GLM-4.5, GLM-4.5-Air
 - **Anthropic**: Claude 3.5 Sonnet, etc.
 
 Switch models mid-session using `/model <provider>:<model-name>`. Perfect for comparing responses or using the right model for each task!
@@ -375,6 +375,8 @@ Use Claude Code's built-in `/model` command with provider prefixes:
 | `/model glm`    | `glm:glm-4.7`                          | Friendly GLM shortcut            |
 | `/model glm47`  | `glm:glm-4.7`                          | Explicit version                 |
 | `/model glm45`  | `glm:glm-4.5`                          | Previous version                 |
+| `/model glm5`   | `glm:glm-5`                             | Latest GLM-5 model              |
+| `/model glm5or`  | `openrouter:z-ai/glm-5`                 | GLM-5 via OpenRouter           |
 | `/model flash`  | `glm:glm-4-flash`                      | Fast model                       |
 | `/model opus`   | `anthropic:claude-opus-4-5-20251101`   | Claude Opus (API key required)   |
 | `/model sonnet` | `anthropic:claude-sonnet-4-5-20250929` | Claude Sonnet (API key required) |
@@ -389,6 +391,8 @@ Use Claude Code's built-in `/model` command with provider prefixes:
 ```typescript
 const MODEL_SHORTCUTS: Record<string, string> = {
   g: "glm:glm-4.7",
+  glm5: "glm:glm-5",
+  glm5or: "openrouter:z-ai/glm-5",
   o1: "openai:o1-preview", // Add your own!
   fast: "glm:glm-4-flash",
   // ... more shortcuts
@@ -745,7 +749,8 @@ Then reload: `. $PROFILE`
 **A**:
 
 - Use **`ccx`** for: Maximum flexibility, model comparison, leveraging different model strengths
-- Use **`ccg` (GLM-4.7)** for: Latest model, complex coding, refactoring, detailed explanations
+- Use **`/model glm5`** for: Latest GLM-5 with advanced agentic capabilities and long-horizon workflows
+- Use **`ccg` (GLM-4.7)** for: Complex coding, refactoring, detailed explanations
 - Use **`ccg45` (GLM-4.5)** for: Previous version, if you need consistency with older projects
 - Use **`ccf` (GLM-4.5-Air)** for: Quick questions, simple tasks, faster responses
 - Use **`cc` (Claude)** for: Your regular Anthropic Claude setup

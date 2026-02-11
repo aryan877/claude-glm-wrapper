@@ -10,6 +10,8 @@ const MODEL_SHORTCUTS: Record<string, string> = {
   "glm": "glm:glm-4.7",
   "glm47": "glm:glm-4.7",
   "glm45": "glm:glm-4.5",
+  "glm5": "glm:glm-5",
+  "glm5or": "openrouter:z-ai/glm-5",
   "flash": "glm:glm-4-flash",
   // Claude shortcuts (for API users)
   "opus": "anthropic:claude-opus-4-5-20251101",
