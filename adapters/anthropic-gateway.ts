@@ -19,7 +19,7 @@ const PORT = Number(process.env.CLAUDE_PROXY_PORT || 17870);
 
 let active: ProviderModel | null = null;
 
-const fastify = Fastify({ logger: false });
+const fastify = Fastify({ logger: false, bodyLimit: 100 * 1024 * 1024 });
 
 // Health check endpoint
 fastify.get("/healthz", async () => ({
