@@ -1,9 +1,22 @@
 // Vision preprocessing: converts image blocks to text descriptions for non-vision models
+import { createHash } from "crypto";
 import type { AnthropicRequest } from "./types.js";
 
 const DEFAULT_VISION_MODEL = "google/gemini-2.5-flash";
 const DESCRIBE_PROMPT =
   "Describe this image in granular detail — layout, text, colors, objects, spatial relationships, any code or data visible.";
+
+// In-memory cache: hash of image data → description text
+const descriptionCache = new Map<string, string>();
+
+function imageKey(block: ImageBlock): string {
+  if (block.source.type === "url" && block.source.url) {
+    return "url:" + block.source.url;
+  }
+  // Hash first 2048 chars of base64 + length for a fast, collision-resistant key
+  const data = block.source.data;
+  return createHash("sha256").update(data.slice(0, 2048) + ":" + data.length).digest("hex");
+}
 
 interface ImageBlock {
   type: "image";
@@ -89,18 +102,29 @@ export async function preprocessImages(
 
   if (tasks.length === 0) return;
 
-  console.log(`[ccx] Describing ${tasks.length} image(s) via ${model}...`);
+  // Split into cached hits and new images that need describing
+  const uncached = tasks.filter((t) => !descriptionCache.has(imageKey(t.block)));
+  const cached = tasks.length - uncached.length;
 
-  const descriptions = await Promise.all(
-    tasks.map((t) => describeImage(t.block, model, apiKey))
-  );
+  if (uncached.length > 0) {
+    console.log(`[ccx] Describing ${uncached.length} new image(s) via ${model} (${cached} cached)...`);
+    const descriptions = await Promise.all(
+      uncached.map((t) => describeImage(t.block, model, apiKey))
+    );
+    for (let i = 0; i < uncached.length; i++) {
+      descriptionCache.set(imageKey(uncached[i].block), descriptions[i]);
+    }
+  } else {
+    console.log(`[ccx] All ${tasks.length} image(s) served from cache`);
+  }
 
   // Replace image blocks with text descriptions (reverse order to preserve indices)
   for (let i = tasks.length - 1; i >= 0; i--) {
     const { msg, idx } = tasks[i];
+    const desc = descriptionCache.get(imageKey(tasks[i].block))!;
     msg.content[idx] = {
       type: "text",
-      text: `[Image Description: ${descriptions[i]}]`,
+      text: `[Image Description: ${desc}]`,
     };
   }
 }
