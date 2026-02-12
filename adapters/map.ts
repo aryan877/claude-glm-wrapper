@@ -17,8 +17,8 @@ const PROVIDER_PREFIXES: ProviderKey[] = [
 // Model shortcuts - add your own aliases here
 const MODEL_SHORTCUTS: Record<string, string> = {
   // GLM shortcuts
-  g: "glm:glm-4.7",
-  glm: "glm:glm-4.7",
+  g: "glm:glm-5",
+  glm: "glm:glm-5",
   glm47: "glm:glm-4.7",
   glm45: "glm:glm-4.5",
   glm5: "glm:glm-5",

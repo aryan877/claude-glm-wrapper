@@ -338,12 +338,12 @@ create_claude_glm_wrapper() {
     
     cat > "$wrapper_path" << EOF
 #!/bin/bash
-# Claude-GLM - Claude Code with Z.AI GLM-4.7 (Standard Model)
+# Claude-GLM - Claude Code with Z.AI GLM-5 (Standard Model)
 
 # Set Z.AI environment variables
 export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
 export ANTHROPIC_AUTH_TOKEN="$ZAI_API_KEY"
-export ANTHROPIC_MODEL="glm-4.7"
+export ANTHROPIC_MODEL="glm-5"
 export ANTHROPIC_SMALL_FAST_MODEL="glm-4.5-air"
 
 # Use custom config directory to avoid conflicts
@@ -358,14 +358,14 @@ cat > "\$CLAUDE_HOME/settings.json" << SETTINGS
   "env": {
     "ANTHROPIC_BASE_URL": "https://api.z.ai/api/anthropic",
     "ANTHROPIC_AUTH_TOKEN": "$ZAI_API_KEY",
-    "ANTHROPIC_MODEL": "glm-4.7",
+    "ANTHROPIC_MODEL": "glm-5",
     "ANTHROPIC_SMALL_FAST_MODEL": "glm-4.5-air"
   }
 }
 SETTINGS
 
 # Launch Claude Code with custom config
-echo "🚀 Starting Claude Code with GLM-4.7 (Standard Model)..."
+echo "🚀 Starting Claude Code with GLM-5 (Standard Model)..."
 echo "📁 Config directory: \$CLAUDE_HOME"
 echo ""
 
@@ -866,7 +866,7 @@ main() {
     echo "📝 After sourcing, you can use:"
     echo ""
     echo "Commands:"
-    echo "   claude-glm      - GLM-4.7 (latest)"
+    echo "   claude-glm      - GLM-5 (latest)"
     echo "   claude-glm-4.5  - GLM-4.5"
     echo "   claude-glm-fast - GLM-4.5-Air (fast)"
     if [ "$install_ccx_choice" != "n" ] && [ "$install_ccx_choice" != "N" ]; then
@@ -875,7 +875,7 @@ main() {
     echo ""
     echo "Aliases:"
     echo "   cc          - claude (regular Claude)"
-    echo "   ccg         - claude-glm (GLM-4.7)"
+    echo "   ccg         - claude-glm (GLM-5)"
     echo "   ccg45       - claude-glm-4.5 (GLM-4.5)"
     echo "   ccf         - claude-glm-fast"
     echo "   claude-d    - claude --dangerously-skip-permissions"
