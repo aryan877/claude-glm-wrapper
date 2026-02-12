@@ -615,11 +615,16 @@ export ANTHROPIC_AUTH_TOKEN="${ANTHROPIC_AUTH_TOKEN:-local-proxy-token}"
 echo "[ccx] Starting Claude Code with multi-provider proxy..."
 echo "[ccx] Proxy will listen on: ${ANTHROPIC_BASE_URL}"
 
-# Kill any stale proxy on the same port
+# Kill any stale ccx proxy (tsx anthropic-gateway) on the same port
 if lsof -ti:${PORT} >/dev/null 2>&1; then
-    echo "[ccx] Killing stale proxy on port ${PORT}..."
-    lsof -ti:${PORT} | xargs kill -9 2>/dev/null || true
-    sleep 0.5
+    STALE_PIDS=$(lsof -ti:${PORT} 2>/dev/null | while read pid; do
+        ps -p "$pid" -o args= 2>/dev/null | grep -q "anthropic-gateway" && echo "$pid"
+    done)
+    if [ -n "$STALE_PIDS" ]; then
+        echo "[ccx] Killing stale proxy on port ${PORT}..."
+        echo "$STALE_PIDS" | xargs kill -9 2>/dev/null || true
+        sleep 0.5
+    fi
 fi
 
 # Start proxy in background
