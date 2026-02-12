@@ -68,6 +68,13 @@ export ANTHROPIC_AUTH_TOKEN="${ANTHROPIC_AUTH_TOKEN:-local-proxy-token}"
 echo "[ccx] Starting Claude Code with multi-provider proxy..."
 echo "[ccx] Proxy will listen on: ${ANTHROPIC_BASE_URL}"
 
+# Kill any stale proxy on the same port
+if lsof -ti:${PORT} >/dev/null 2>&1; then
+    echo "[ccx] Killing stale proxy on port ${PORT}..."
+    lsof -ti:${PORT} | xargs kill -9 2>/dev/null || true
+    sleep 0.5
+fi
+
 # Start proxy in background
 npx -y tsx "${ROOT_DIR}/adapters/anthropic-gateway.ts" > /tmp/claude-proxy.log 2>&1 &
 PROXY_PID=$!
