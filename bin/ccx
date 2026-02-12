@@ -68,43 +68,38 @@ export ANTHROPIC_AUTH_TOKEN="${ANTHROPIC_AUTH_TOKEN:-local-proxy-token}"
 echo "[ccx] Starting Claude Code with multi-provider proxy..."
 echo "[ccx] Proxy will listen on: ${ANTHROPIC_BASE_URL}"
 
-# Kill any stale ccx proxy (tsx anthropic-gateway) on the same port
-if lsof -ti:${PORT} >/dev/null 2>&1; then
-    STALE_PIDS=$(lsof -ti:${PORT} 2>/dev/null | while read pid; do
-        ps -p "$pid" -o args= 2>/dev/null | grep -q "anthropic-gateway" && echo "$pid"
-    done)
-    if [ -n "$STALE_PIDS" ]; then
-        echo "[ccx] Killing stale proxy on port ${PORT}..."
-        echo "$STALE_PIDS" | xargs kill -9 2>/dev/null || true
+# Check if a proxy is already running on this port
+SHARED_PROXY=false
+if curl -sf "http://127.0.0.1:${PORT}/healthz" >/dev/null 2>&1; then
+    echo "[ccx] Reusing existing proxy on port ${PORT}"
+    SHARED_PROXY=true
+else
+    # Start proxy in background
+    npx -y tsx "${ROOT_DIR}/adapters/anthropic-gateway.ts" > /tmp/claude-proxy.log 2>&1 &
+    PROXY_PID=$!
+
+    cleanup() {
+        echo ""
+        echo "[ccx] Shutting down proxy..."
+        kill ${PROXY_PID} 2>/dev/null || true
+    }
+    trap cleanup EXIT INT TERM
+
+    # Wait for proxy to be ready (health check)
+    echo "[ccx] Waiting for proxy to start..."
+    for i in {1..30}; do
+        if curl -sf "http://127.0.0.1:${PORT}/healthz" >/dev/null 2>&1; then
+            echo "[ccx] Proxy ready!"
+            break
+        fi
+        if [ $i -eq 30 ]; then
+            echo "❌ Proxy failed to start. Check /tmp/claude-proxy.log"
+            cat /tmp/claude-proxy.log
+            exit 1
+        fi
         sleep 0.5
-    fi
+    done
 fi
-
-# Start proxy in background
-npx -y tsx "${ROOT_DIR}/adapters/anthropic-gateway.ts" > /tmp/claude-proxy.log 2>&1 &
-PROXY_PID=$!
-
-cleanup() {
-    echo ""
-    echo "[ccx] Shutting down proxy..."
-    kill ${PROXY_PID} 2>/dev/null || true
-}
-trap cleanup EXIT INT TERM
-
-# Wait for proxy to be ready (health check)
-echo "[ccx] Waiting for proxy to start..."
-for i in {1..30}; do
-    if curl -sf "http://127.0.0.1:${PORT}/healthz" >/dev/null 2>&1; then
-        echo "[ccx] Proxy ready!"
-        break
-    fi
-    if [ $i -eq 30 ]; then
-        echo "❌ Proxy failed to start. Check /tmp/claude-proxy.log"
-        cat /tmp/claude-proxy.log
-        exit 1
-    fi
-    sleep 0.5
-done
 
 echo ""
 echo "🎯 Available model prefixes:"
