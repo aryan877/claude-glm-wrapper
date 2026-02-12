@@ -661,11 +661,21 @@ echo "💡 Switch models in-session with: /model <prefix>:<model-name>"
 echo ""
 
 # Hand off to Claude Code with glm-5 as default model
-exec claude --model "${ANTHROPIC_MODEL:-glm-5}" "$@"
+EXTRA_FLAGS=""
+if [[ "\$(basename "\$0")" == "ccxd" ]]; then
+    EXTRA_FLAGS="--dangerously-skip-permissions"
+    echo "⚡ Running with --dangerously-skip-permissions"
+fi
+exec claude --model "\${ANTHROPIC_MODEL:-glm-5}" \$EXTRA_FLAGS "\$@"
 CCXEOF
 
     chmod +x "$wrapper_path"
     echo "✅ Installed ccx at $wrapper_path"
+
+    # Create ccxd symlink (dangerous permissions mode)
+    local ccxd_path="${wrapper_path%ccx}ccxd"
+    ln -sf "$wrapper_path" "$ccxd_path"
+    echo "✅ Installed ccxd at $ccxd_path (--dangerously-skip-permissions)"
 
     # Add ccx alias to shell config
     add_ccx_alias
