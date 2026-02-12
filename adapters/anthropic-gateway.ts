@@ -6,6 +6,7 @@ import { chatOpenAI } from "./providers/openai.js";
 import { chatOpenRouter } from "./providers/openrouter.js";
 import { chatGemini } from "./providers/gemini.js";
 import { passThrough } from "./providers/anthropic-pass.js";
+import { preprocessImages } from "./vision-preprocess.js";
 import { config } from "dotenv";
 import { join } from "path";
 import { homedir } from "os";
@@ -28,7 +29,7 @@ fastify.get("/healthz", async () => ({
 
 // Status endpoint (shows current active provider/model)
 fastify.get("/_status", async () => {
-  return active ?? { provider: "glm", model: "glm-4.6" };
+  return active ?? { provider: "glm", model: "glm-5" };
 });
 
 // Main messages endpoint - routes by model prefix
@@ -47,7 +48,10 @@ fastify.post("/v1/messages", async (req, res) => {
     // Warn if using tools with providers that may not support them
     warnIfTools(body, provider);
 
-    active = { provider, model };
+    // Don't let internal Claude Code requests (haiku for titles, etc.) override the user's active model
+    if (provider !== "anthropic") {
+      active = { provider, model };
+    }
 
     // Validate API keys BEFORE setting headers
     if (provider === "openai") {
@@ -122,6 +126,8 @@ fastify.post("/v1/messages", async (req, res) => {
         "GLM_UPSTREAM_URL and ZAI_API_KEY not set in ~/.claude-proxy/.env. Run: ccx --setup"
       );
     }
+    // Convert images to text descriptions since GLM doesn't support vision
+    await preprocessImages(body, process.env.OPENROUTER_API_KEY);
     // Don't set headers here - passThrough will do it after validation
     return passThrough({
       res,

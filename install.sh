@@ -611,6 +611,7 @@ fi
 
 export ANTHROPIC_BASE_URL="http://127.0.0.1:${PORT}"
 export ANTHROPIC_AUTH_TOKEN="${ANTHROPIC_AUTH_TOKEN:-local-proxy-token}"
+export ANTHROPIC_MODEL="${ANTHROPIC_MODEL:-glm-5}"
 
 echo "[ccx] Starting Claude Code with multi-provider proxy..."
 echo "[ccx] Proxy will listen on: ${ANTHROPIC_BASE_URL}"
@@ -653,14 +654,14 @@ echo "🎯 Available model prefixes:"
 echo "  openai:<model>      - OpenAI models (gpt-4o, gpt-4o-mini, etc.)"
 echo "  openrouter:<model>  - OpenRouter models"
 echo "  gemini:<model>      - Google Gemini models"
-echo "  glm:<model>         - Z.AI GLM models (glm-4.7, glm-4.5, etc.)"
+echo "  glm:<model>         - Z.AI GLM models (glm-5, glm-4.7, glm-4.5, etc.)"
 echo "  anthropic:<model>   - Anthropic Claude models"
 echo ""
 echo "💡 Switch models in-session with: /model <prefix>:<model-name>"
 echo ""
 
-# Hand off to Claude Code
-exec claude "$@"
+# Hand off to Claude Code with glm-5 as default model
+exec claude --model "${ANTHROPIC_MODEL:-glm-5}" "$@"
 CCXEOF
 
     chmod +x "$wrapper_path"

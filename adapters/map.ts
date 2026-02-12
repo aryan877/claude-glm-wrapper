@@ -57,6 +57,11 @@ export function parseProviderModel(
     return { provider: "anthropic", model: expanded };
   }
 
+  // Auto-detect GLM models (start with "glm-") and route to glm
+  if (expanded.toLowerCase().startsWith("glm-")) {
+    return { provider: "glm", model: expanded };
+  }
+
   const sep = expanded.includes(":")
     ? ":"
     : expanded.includes("/")
