@@ -1,6 +1,6 @@
 {
   "name": "claude-glm",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Cross-platform installer for Claude Code with Z.AI GLM models, multi-provider proxy, and dangerously-skip-permissions shortcuts. Run with: npx claude-glm",
   "keywords": [
     "claude",

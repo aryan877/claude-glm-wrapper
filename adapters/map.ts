@@ -24,6 +24,10 @@ const MODEL_SHORTCUTS: Record<string, string> = {
   glm5: "glm:glm-5",
   glm5or: "openrouter:z-ai/glm-5",
   flash: "glm:glm-4-flash",
+  // MiniMax shortcuts
+  minimax: "openrouter:minimax/minimax-m2.5",
+  mm: "openrouter:minimax/minimax-m2.5",
+  m25: "openrouter:minimax/minimax-m2.5",
   // Claude shortcuts (for API users)
   opus: "anthropic:claude-opus-4-5-20251101",
   sonnet: "anthropic:claude-sonnet-4-5-20250929",
