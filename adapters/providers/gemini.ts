@@ -71,6 +71,7 @@ export async function chatGemini(
   }
 
   stopAnthropicMessage(res);
+  res.raw.end();
 }
 
 function withStatus(status: number, message: string) {

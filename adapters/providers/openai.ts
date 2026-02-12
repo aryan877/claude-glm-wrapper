@@ -72,6 +72,7 @@ export async function chatOpenAI(
   }
 
   stopAnthropicMessage(res);
+  res.raw.end();
 }
 
 function withStatus(status: number, message: string) {
