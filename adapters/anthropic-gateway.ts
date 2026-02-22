@@ -214,6 +214,26 @@ fastify.post("/v1/messages", async (req, res) => {
     // Warn if using tools with providers that may not support them
     warnIfTools(body, provider);
 
+    // For providers with native web search, strip Claude's WebSearch tool
+    // and inject a system prompt telling the model to use its own search.
+    // Claude Code's WebSearch runs locally and won't work through the proxy.
+    const hasNativeSearch = ["codex-oauth", "openai", "gemini-oauth", "gemini"].includes(provider);
+    if (hasNativeSearch) {
+      // Remove WebSearch / WebFetch tools so the model can't invoke them
+      if (body.tools) {
+        body.tools = body.tools.filter((t: any) => t.name !== "WebSearch" && t.name !== "WebFetch");
+      }
+      // Append instruction to system prompt
+      const searchNote = "\n\nIMPORTANT: You have native server-side web search. Do NOT use the WebSearch or WebFetch tools — they will not work. Instead, use your built-in web search capability when you need to look something up online.";
+      if (Array.isArray(body.system)) {
+        body.system = [...body.system, { type: "text", text: searchNote }];
+      } else if (body.system) {
+        body.system = body.system + searchNote;
+      } else {
+        body.system = searchNote.trim();
+      }
+    }
+
     // Don't let internal Claude Code requests (haiku for titles, etc.) override the user's active model
     if (provider !== "anthropic") {
       active = { provider, model };
