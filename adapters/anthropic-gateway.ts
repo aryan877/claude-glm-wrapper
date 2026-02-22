@@ -21,7 +21,7 @@ import {
   codexLogout,
   codexLoginPage,
 } from "./openai-auth.js";
-import { writePid, registerCleanup } from "./pid-manager.js";
+import { writePid, registerCleanup } from "../bin/lib/pid-manager.js";
 import { config } from "dotenv";
 import { join } from "path";
 import { homedir } from "os";

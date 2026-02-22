@@ -1,81 +1,16 @@
-// Proxy launcher with PID+startTime lock verification
-// Starts proxy in background, launches claude, kills proxy on exit
+// Proxy launcher — starts proxy, launches claude, kills proxy on exit
 //
 // The proxy is provider-agnostic: it routes by model name (e.g. "codex" → codex-oauth,
 // "gemini" → gemini-oauth). So if claude-codex started the proxy and claude-gemini
 // runs next, it just reuses the same proxy — no restart needed.
 
-import { readFile, unlink } from "fs/promises";
 import { join } from "path";
 import { homedir } from "os";
-import { spawn, execSync } from "child_process";
-
-const PID_FILE = join(homedir(), ".claude-proxy", "proxy.pid");
-
-// ── PID lock helpers ─────────────────────────────────────────────────
-
-async function readLock() {
-  try { return JSON.parse(await readFile(PID_FILE, "utf-8")); }
-  catch { return null; }
-}
-
-function isAlive(pid) {
-  try { process.kill(pid, 0); return true; }
-  catch (e) { return e.code === "EPERM"; }
-}
-
-async function removeLock() {
-  try { await unlink(PID_FILE); } catch {}
-}
-
-async function fetchHealth(port) {
-  try {
-    const c = new AbortController();
-    const t = setTimeout(() => c.abort(), 2000);
-    const r = await fetch(`http://127.0.0.1:${port}/healthz`, { signal: c.signal });
-    clearTimeout(t);
-    return r.ok ? await r.json() : null;
-  } catch { return null; }
-}
-
-async function killPid(pid) {
-  if (!isAlive(pid)) { await removeLock(); return true; }
-  try { process.kill(pid, "SIGTERM"); } catch { await removeLock(); return true; }
-  for (let i = 0; i < 30; i++) {
-    await new Promise(r => setTimeout(r, 100));
-    if (!isAlive(pid)) { await removeLock(); return true; }
-  }
-  try { process.kill(pid, "SIGKILL"); } catch {}
-  for (let i = 0; i < 10; i++) {
-    await new Promise(r => setTimeout(r, 100));
-    if (!isAlive(pid)) { await removeLock(); return true; }
-  }
-  return false;
-}
-
-/** Kill whatever is listening on the port (lsof-based fallback) */
-function killPortOccupant(port) {
-  try {
-    const pids = execSync(`lsof -ti:${port}`, { encoding: "utf-8" }).trim().split("\n").filter(Boolean);
-    for (const p of pids) {
-      try { process.kill(Number(p), "SIGTERM"); } catch {}
-    }
-    // Wait a moment for processes to die
-    for (let i = 0; i < 20; i++) {
-      const alive = pids.some(p => { try { process.kill(Number(p), 0); return true; } catch { return false; } });
-      if (!alive) return true;
-      // Sync sleep via execSync (we're in startup, blocking is fine)
-      execSync("sleep 0.1");
-    }
-    // Force kill remaining
-    for (const p of pids) {
-      try { process.kill(Number(p), "SIGKILL"); } catch {}
-    }
-    return true;
-  } catch {
-    return false; // lsof failed = nothing on port
-  }
-}
+import { spawn } from "child_process";
+import {
+  readLock, removeLock, isAlive,
+  fetchHealth, killPid, killPortOccupant,
+} from "./pid-manager.js";
 
 // ── Wait for proxy health ────────────────────────────────────────────
 
@@ -101,21 +36,15 @@ async function waitForProxy(port, maxWait = 15000) {
  */
 export async function launchProxy({ rootDir, provider, model, defaultModel, startedBy, forceRestart = false, extraArgs = [] }) {
   const PORT = Number(process.env.CLAUDE_PROXY_PORT || 17870);
-  let weStartedProxy = false;
 
   // Step 1: Check if a healthy proxy is already running
   const health = await fetchHealth(PORT);
 
   if (health && !forceRestart) {
-    // Healthy proxy exists — reuse it regardless of who started it.
-    // The proxy routes by model name, so codex/gemini/glm all work on the same instance.
     console.log(`  Proxy already running (PID ${health.pid}, ${health.active?.provider || "unknown"}:${health.active?.model || "auto"})`);
   } else {
-    // Either no healthy proxy, or force restart requested
-
     // Step 2: Clean up anything occupying the port
     if (health && forceRestart) {
-      // Healthy but we want a restart — kill via PID lock or health PID
       const lock = await readLock();
       const pidToKill = lock?.pid || health.pid;
       if (pidToKill) {
@@ -124,23 +53,18 @@ export async function launchProxy({ rootDir, provider, model, defaultModel, star
         await new Promise(r => setTimeout(r, 300));
       }
     } else {
-      // Not healthy — check for zombie/stale processes
       const lock = await readLock();
       if (lock?.pid && isAlive(lock.pid)) {
-        // Process alive but not responding to health — zombie proxy
         console.log(`  Stale proxy detected (PID ${lock.pid}, not responding). Killing...`);
         await killPid(lock.pid);
         await new Promise(r => setTimeout(r, 300));
       }
       await removeLock();
-
-      // Also kill anything else squatting on the port (e.g. orphaned tsx process)
       killPortOccupant(PORT);
       await new Promise(r => setTimeout(r, 200));
     }
 
     // Step 3: Start a new proxy
-    weStartedProxy = true;
     const proxyLog = join(homedir(), ".claude-proxy", "proxy.log");
     const proxy = spawn("npx", ["tsx", join(rootDir, "adapters", "anthropic-gateway.ts")], {
       cwd: rootDir,
@@ -149,13 +73,11 @@ export async function launchProxy({ rootDir, provider, model, defaultModel, star
       detached: false,
     });
 
-    // Pipe proxy output to log file (and also to console until claude starts)
     const fs = await import("fs");
     const logStream = fs.createWriteStream(proxyLog, { flags: "a" });
     proxy.stdout.pipe(logStream);
     proxy.stderr.pipe(logStream);
 
-    // Also show proxy startup output
     proxy.stdout.on("data", (d) => process.stdout.write(d));
     proxy.stderr.on("data", (d) => process.stderr.write(d));
 
@@ -167,14 +89,10 @@ export async function launchProxy({ rootDir, provider, model, defaultModel, star
       process.exit(1);
     }
 
-    // Stop showing proxy output now that claude will take over
     proxy.stdout.removeAllListeners("data");
     proxy.stderr.removeAllListeners("data");
 
-    // Kill proxy when this process exits
-    const cleanup = () => {
-      try { proxy.kill("SIGTERM"); } catch {}
-    };
+    const cleanup = () => { try { proxy.kill("SIGTERM"); } catch {} };
     process.on("exit", cleanup);
     process.on("SIGINT", () => { cleanup(); process.exit(0); });
     process.on("SIGTERM", () => { cleanup(); process.exit(0); });
@@ -220,7 +138,6 @@ export async function stopProxy() {
       console.log("  Stopped (force).");
     }
   } else {
-    // No healthy proxy, but maybe zombie?
     const lock = await readLock();
     if (lock?.pid && isAlive(lock.pid)) {
       console.log(`  Killing stale proxy (PID ${lock.pid})...`);
