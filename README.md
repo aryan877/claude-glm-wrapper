@@ -9,7 +9,7 @@ A local proxy that translates between Claude Code's Anthropic API format and mul
 | Provider | Auth Method | Models |
 |----------|------------|--------|
 | **OpenAI Codex** | OAuth (ChatGPT Plus subscription) | GPT-5.3-Codex, GPT-5.2-Codex, GPT-5.1-Codex-Max/Mini |
-| **Google Gemini** | OAuth (Google account) | Gemini 3 Pro, Gemini 3 Flash, Gemini 2.5 Pro/Flash |
+| **Google Gemini** | OAuth (Google account) | Gemini 3/3.1 Pro, Gemini 3 Flash, Gemini 2.5 Pro/Flash |
 | **Z.AI GLM** | API key | GLM-5, GLM-4.7, GLM-4.5, GLM-4-Flash |
 | **OpenRouter** | API key | Hundreds of models |
 | **Anthropic** | API key | Claude Opus, Sonnet, Haiku (passthrough) |
@@ -95,6 +95,8 @@ Instead of typing `provider:full-model-name`, use shortcuts:
 /model gemini         → gemini-3-pro-preview (default Gemini)
 /model gemini-pro     → gemini-3-pro-preview
 /model gemini-flash   → gemini-3-flash-preview
+/model gemini-31p     → gemini-3.1-pro-preview (standard API only)
+/model gemini-31f     → gemini-3.1-flash-preview (standard API only)
 /model gemini-25p     → gemini-2.5-pro
 /model gemini-25f     → gemini-2.5-flash
 /model gp             → gemini-3-pro-preview (short alias)
@@ -241,7 +243,8 @@ All reasoning-capable models stream their thinking process:
 | Provider | How Reasoning Works |
 |----------|-------------------|
 | Codex (GPT-5.x) | `reasoning.effort`: low/medium/high/xhigh |
-| Gemini 3 | `thinkingLevel`: LOW/MEDIUM/HIGH |
+| Gemini 3 Pro | `thinkingLevel`: LOW/HIGH only (medium → HIGH) |
+| Gemini 3.1 Pro, 3 Flash | `thinkingLevel`: LOW/MEDIUM/HIGH |
 | Gemini 2.5 | `thinkingBudget`: token count |
 
 Thinking tokens appear as `thinking` blocks in Claude Code, just like native Claude extended thinking.

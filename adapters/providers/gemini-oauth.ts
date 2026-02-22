@@ -197,13 +197,28 @@ async function _chatGeminiOAuthInner(
   // Detect Gemini 3 vs 2.5 models for thinking config
   const isGemini3 = /^gemini-3(\.|-|$)/.test(model);
 
+  // gemini-3-pro-preview only supports LOW and HIGH (no MEDIUM/MINIMAL)
+  // gemini-3.1-pro-preview, gemini-3-flash-preview, gemini-3.1-flash-preview support MINIMAL/LOW/MEDIUM/HIGH
+  const isLimitedThinking = model === "gemini-3-pro-preview";
+
   // Build thinking config based on model family
   // Gemini 3: uses thinkingLevel (LOW/MEDIUM/HIGH)
   // Gemini 2.5: uses thinkingBudget (number of tokens)
   let thinkingConfig: any;
   if (isGemini3) {
-    const THINKING_LEVELS: Record<string, string> = { low: "LOW", medium: "MEDIUM", high: "HIGH", xhigh: "HIGH" };
-    const thinkingLevel = THINKING_LEVELS[reasoning || ""] || "HIGH";
+    let thinkingLevel: string;
+    if (isLimitedThinking) {
+      // gemini-3-pro-preview: only LOW and HIGH
+      const LIMITED_LEVELS: Record<string, string> = { low: "LOW", medium: "HIGH", high: "HIGH", xhigh: "HIGH" };
+      thinkingLevel = LIMITED_LEVELS[reasoning || ""] || "HIGH";
+      if (reasoning === "medium") {
+        console.log(`[gemini] Note: ${model} doesn't support MEDIUM, using HIGH instead`);
+      }
+    } else {
+      // 3.1-pro, 3-flash, 3.1-flash: full range
+      const THINKING_LEVELS: Record<string, string> = { low: "LOW", medium: "MEDIUM", high: "HIGH", xhigh: "HIGH" };
+      thinkingLevel = THINKING_LEVELS[reasoning || ""] || "HIGH";
+    }
     thinkingConfig = { includeThoughts: true, thinkingLevel };
     console.log(`[gemini] Gemini 3 model: thinkingLevel=${thinkingLevel}${reasoning ? ` (${reasoning})` : ""}`);
   } else {

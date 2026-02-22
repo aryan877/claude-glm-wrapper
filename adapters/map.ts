@@ -41,6 +41,8 @@ const MODEL_SHORTCUTS: Record<string, string> = {
   gemini: "gemini-oauth:gemini-3-pro-preview",
   "gemini-pro": "gemini-oauth:gemini-3-pro-preview",
   "gemini-flash": "gemini-oauth:gemini-3-flash-preview",
+  "gemini-31p": "gemini-oauth:gemini-3.1-pro-preview",
+  "gemini-31f": "gemini-oauth:gemini-3.1-flash-preview",
   "gemini-25p": "gemini-oauth:gemini-2.5-pro",
   "gemini-25f": "gemini-oauth:gemini-2.5-flash",
   gp: "gemini-oauth:gemini-3-pro-preview",
