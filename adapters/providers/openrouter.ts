@@ -1,6 +1,7 @@
 // OpenRouter adapter (OpenAI-compatible API) with full tool calling support
 import { FastifyReply } from "fastify";
 import { createParser } from "eventsource-parser";
+import type { EventSourceMessage } from "eventsource-parser";
 import { sendEvent } from "../sse.js";
 import type { AnthropicRequest, AnthropicMessage, AnthropicTool, AnthropicContentBlock } from "../types.js";
 
@@ -219,55 +220,57 @@ export async function chatOpenRouter(
 
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
-  const parser = createParser({ onEvent: (event: any) => {
-    const data = event.data;
-    if (!data || data === "[DONE]") return;
-    try {
-      const json = JSON.parse(data);
-      const choice = json.choices?.[0];
-      if (!choice) return;
+  const parser = createParser({
+    onEvent(event: EventSourceMessage) {
+      const data = event.data;
+      if (!data || data === "[DONE]") return;
+      try {
+        const json = JSON.parse(data);
+        const choice = json.choices?.[0];
+        if (!choice) return;
 
-      const delta = choice.delta;
-      if (!delta) return;
+        const delta = choice.delta;
+        if (!delta) return;
 
-      // Handle reasoning/thinking tokens (GLM-5 and other reasoning models)
-      const reasoningChunk = delta.reasoning || "";
-      if (reasoningChunk) {
-        ensureThinkingBlockStarted();
-        sendEvent(res, "content_block_delta", {
-          type: "content_block_delta",
-          index: contentIndex,
-          delta: { type: "thinking_delta", thinking: reasoningChunk },
-        });
-      }
-
-      // Handle text content
-      const textChunk = delta.content || "";
-      if (textChunk) {
-        ensureContentBlockStarted();
-        sendEvent(res, "content_block_delta", {
-          type: "content_block_delta",
-          index: contentIndex,
-          delta: { type: "text_delta", text: textChunk },
-        });
-      }
-
-      // Handle streaming tool calls
-      if (delta.tool_calls) {
-        for (const tc of delta.tool_calls) {
-          const idx = tc.index ?? 0;
-          if (!pendingToolCalls[idx]) {
-            pendingToolCalls[idx] = { id: "", name: "", arguments: "" };
-          }
-          if (tc.id) pendingToolCalls[idx].id = tc.id;
-          if (tc.function?.name) pendingToolCalls[idx].name += tc.function.name;
-          if (tc.function?.arguments) pendingToolCalls[idx].arguments += tc.function.arguments;
+        // Handle reasoning/thinking tokens (GLM-5 and other reasoning models)
+        const reasoningChunk = delta.reasoning || "";
+        if (reasoningChunk) {
+          ensureThinkingBlockStarted();
+          sendEvent(res, "content_block_delta", {
+            type: "content_block_delta",
+            index: contentIndex,
+            delta: { type: "thinking_delta", thinking: reasoningChunk },
+          });
         }
+
+        // Handle text content
+        const textChunk = delta.content || "";
+        if (textChunk) {
+          ensureContentBlockStarted();
+          sendEvent(res, "content_block_delta", {
+            type: "content_block_delta",
+            index: contentIndex,
+            delta: { type: "text_delta", text: textChunk },
+          });
+        }
+
+        // Handle streaming tool calls
+        if (delta.tool_calls) {
+          for (const tc of delta.tool_calls) {
+            const idx = tc.index ?? 0;
+            if (!pendingToolCalls[idx]) {
+              pendingToolCalls[idx] = { id: "", name: "", arguments: "" };
+            }
+            if (tc.id) pendingToolCalls[idx].id = tc.id;
+            if (tc.function?.name) pendingToolCalls[idx].name += tc.function.name;
+            if (tc.function?.arguments) pendingToolCalls[idx].arguments += tc.function.arguments;
+          }
+        }
+      } catch {
+        // ignore parse errors
       }
-    } catch {
-      // ignore parse errors
-    }
-  }});
+    },
+  });
 
   while (true) {
     const { value, done } = await reader.read();

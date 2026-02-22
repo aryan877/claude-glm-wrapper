@@ -4,13 +4,17 @@ import {
   AnthropicRequest,
   ProviderKey,
   ProviderModel,
+  ReasoningLevel,
 } from "./types.js";
+
+const VALID_REASONING: ReasoningLevel[] = ["low", "medium", "high", "xhigh"];
 
 const PROVIDER_PREFIXES: ProviderKey[] = [
   "openai",
   "openrouter",
   "gemini",
   "gemini-oauth",
+  "codex-oauth",
   "glm",
   "anthropic",
 ];
@@ -34,15 +38,23 @@ const MODEL_SHORTCUTS: Record<string, string> = {
   sonnet: "anthropic:claude-sonnet-4-5-20250929",
   haiku: "anthropic:claude-haiku-4-5-20251001",
   // Gemini OAuth shortcuts (Google account login)
-  go: "gemini-oauth:gemini-3-pro-preview",
-  gp: "gemini-oauth:gemini-3-pro-preview",
-  g3: "gemini-oauth:gemini-3-pro-preview",
+  gemini: "gemini-oauth:gemini-3-pro-preview",
   "gemini-pro": "gemini-oauth:gemini-3-pro-preview",
-  gf: "gemini-oauth:gemini-3-flash-preview",
   "gemini-flash": "gemini-oauth:gemini-3-flash-preview",
-  "g25p": "gemini-oauth:gemini-2.5-pro",
-  "g25f": "gemini-oauth:gemini-2.5-flash",
-  // Add more shortcuts as needed
+  "gemini-25p": "gemini-oauth:gemini-2.5-pro",
+  "gemini-25f": "gemini-oauth:gemini-2.5-flash",
+  gp: "gemini-oauth:gemini-3-pro-preview",
+  gf: "gemini-oauth:gemini-3-flash-preview",
+  // Codex OAuth shortcuts (OpenAI ChatGPT Plus subscription)
+  codex: "codex-oauth:gpt-5.3-codex",
+  "codex-5.3": "codex-oauth:gpt-5.3-codex",
+  "codex-5.2": "codex-oauth:gpt-5.2-codex",
+  "codex-max": "codex-oauth:gpt-5.1-codex-max",
+  "codex-mini": "codex-oauth:gpt-5.1-codex-mini",
+  "gpt52": "codex-oauth:gpt-5.2",
+  cx: "codex-oauth:gpt-5.3-codex",
+  cx53: "codex-oauth:gpt-5.3-codex",
+  cx52: "codex-oauth:gpt-5.2-codex",
 };
 
 /**
@@ -59,17 +71,29 @@ export function parseProviderModel(
     throw new Error("Missing 'model' in request");
   }
 
+  // Extract @reasoning suffix (e.g. "codex@high", "gemini@low")
+  let reasoning: ReasoningLevel | undefined;
+  let rawField = modelField;
+  const atIdx = modelField.lastIndexOf("@");
+  if (atIdx > 0) {
+    const suffix = modelField.slice(atIdx + 1).toLowerCase() as ReasoningLevel;
+    if (VALID_REASONING.includes(suffix)) {
+      reasoning = suffix;
+      rawField = modelField.slice(0, atIdx);
+    }
+  }
+
   // Expand shortcuts first
-  const expanded = MODEL_SHORTCUTS[modelField.toLowerCase()] || modelField;
+  const expanded = MODEL_SHORTCUTS[rawField.toLowerCase()] || rawField;
 
   // Auto-detect Claude models (start with "claude-") and route to anthropic
   if (expanded.toLowerCase().startsWith("claude-")) {
-    return { provider: "anthropic", model: expanded };
+    return { provider: "anthropic", model: expanded, reasoning };
   }
 
   // Auto-detect GLM models (start with "glm-") and route to glm
   if (expanded.toLowerCase().startsWith("glm-")) {
-    return { provider: "glm", model: expanded };
+    return { provider: "glm", model: expanded, reasoning };
   }
 
   const sep = expanded.includes(":")
@@ -78,19 +102,19 @@ export function parseProviderModel(
       ? "/"
       : null;
   if (!sep) {
-    // no prefix: fall back to defaults or assume glm as legacy
-    return defaults ?? { provider: "glm", model: expanded };
+    const base = defaults ?? { provider: "glm" as ProviderKey, model: expanded };
+    return { ...base, reasoning: reasoning ?? base.reasoning };
   }
 
   const [maybeProv, ...rest] = expanded.split(sep);
   const prov = maybeProv.toLowerCase() as ProviderKey;
 
   if (!PROVIDER_PREFIXES.includes(prov)) {
-    // unrecognized prefix -> use defaults or treat full string as model
-    return defaults ?? { provider: "glm", model: expanded };
+    const base = defaults ?? { provider: "glm" as ProviderKey, model: expanded };
+    return { ...base, reasoning: reasoning ?? base.reasoning };
   }
 
-  return { provider: prov, model: rest.join(sep) };
+  return { provider: prov, model: rest.join(sep), reasoning };
 }
 
 /**
@@ -101,8 +125,8 @@ export function warnIfTools(
   provider: ProviderKey,
 ): void {
   if (req.tools && req.tools.length > 0) {
-    // GLM, Anthropic, and Gemini OAuth support tools natively
-    if (provider !== "glm" && provider !== "anthropic" && provider !== "gemini-oauth") {
+    // GLM, Anthropic, Gemini OAuth, and Codex OAuth support tools natively
+    if (provider !== "glm" && provider !== "anthropic" && provider !== "gemini-oauth" && provider !== "codex-oauth") {
       console.warn(
         `[proxy] Warning: ${provider} may not fully support Anthropic-style tools. Passing through anyway.`,
       );

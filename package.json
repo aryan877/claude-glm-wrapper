@@ -1,7 +1,7 @@
 {
-  "name": "claude-glm",
-  "version": "1.4.0",
-  "description": "Cross-platform installer for Claude Code with Z.AI GLM models, multi-provider proxy, Gemini OAuth, and dangerously-skip-permissions shortcuts. Run with: npx claude-glm",
+  "name": "claude-proxy",
+  "version": "1.5.0",
+  "description": "Cross-platform installer for Claude Code with Z.AI GLM models, multi-provider proxy, Gemini OAuth, Codex OAuth, and dangerously-skip-permissions shortcuts. Run with: npx claude-proxy",
   "keywords": [
     "claude",
     "claude-code",
@@ -11,25 +11,30 @@
     "openrouter",
     "gemini",
     "gemini-oauth",
+    "codex-oauth",
     "google",
     "ai",
     "llm",
     "installer",
     "proxy"
   ],
-  "homepage": "https://github.com/aryan877/claude-glm-wrapper#readme",
+  "homepage": "https://github.com/aryan877/claude-proxy#readme",
   "bugs": {
-    "url": "https://github.com/aryan877/claude-glm-wrapper/issues"
+    "url": "https://github.com/aryan877/claude-proxy/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/aryan877/claude-glm-wrapper.git"
+    "url": "git+https://github.com/aryan877/claude-proxy.git"
   },
   "license": "MIT",
   "author": "aryan877",
   "type": "module",
   "bin": {
-    "claude-glm": "bin/cli.js"
+    "claude-proxy-install": "bin/cli.js",
+    "claude-codex": "bin/claude-codex.js",
+    "claude-codex-d": "bin/claude-codex-d.js",
+    "claude-gemini": "bin/claude-gemini.js",
+    "claude-gemini-d": "bin/claude-gemini-d.js"
   },
   "files": [
     "bin/",
@@ -44,7 +49,7 @@
     "preinstall": "node bin/preinstall.js",
     "start:proxy": "tsx adapters/anthropic-gateway.ts",
     "build": "tsc -p tsconfig.json",
-    "test": "echo \"No tests yet\" && exit 0"
+    "test": "vitest run"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -57,7 +62,8 @@
   "devDependencies": {
     "@types/node": "^20.14.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^4.0.18"
   },
   "main": "index.js"
 }

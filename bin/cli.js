@@ -8,8 +8,8 @@ const fs = require('fs');
 const platform = os.platform();
 const rootDir = path.join(__dirname, '..');
 
-console.log('🔧 Claude-GLM Cross-Platform Installer');
-console.log('=======================================\n');
+console.log('🔧 Claude Proxy Cross-Platform Installer');
+console.log('==========================================\n');
 console.log(`Detected OS: ${platform}\n`);
 
 function runInstaller() {

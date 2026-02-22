@@ -2,10 +2,9 @@
 import Fastify from "fastify";
 import { parseProviderModel, warnIfTools } from "./map.js";
 import type { AnthropicRequest, ProviderModel } from "./types.js";
-import { chatOpenAI } from "./providers/openai.js";
 import { chatOpenRouter } from "./providers/openrouter.js";
-import { chatGemini } from "./providers/gemini.js";
 import { chatGeminiOAuth } from "./providers/gemini-oauth.js";
+import { chatCodexOAuth } from "./providers/codex-oauth.js";
 import { passThrough } from "./providers/anthropic-pass.js";
 import { preprocessImages } from "./vision-preprocess.js";
 import {
@@ -15,6 +14,14 @@ import {
   googleLogout,
   loginPage,
 } from "./google-auth.js";
+import {
+  buildCodexLoginUrl,
+  handleCodexOAuthCallback,
+  getCodexLoginStatus,
+  codexLogout,
+  codexLoginPage,
+} from "./openai-auth.js";
+import { writePid, registerCleanup } from "./pid-manager.js";
 import { config } from "dotenv";
 import { join } from "path";
 import { homedir } from "os";
@@ -25,13 +32,24 @@ config({ path: envPath });
 
 const PORT = Number(process.env.CLAUDE_PROXY_PORT || 17870);
 
-let active: ProviderModel | null = null;
+// Support default provider from CLI commands (claude-codex, claude-gemini)
+const defaultProvider = process.env.CCX_DEFAULT_PROVIDER as import("./types.js").ProviderKey | undefined;
+const defaultModel = process.env.CCX_DEFAULT_MODEL;
+
+let active: ProviderModel | null = defaultProvider && defaultModel
+  ? { provider: defaultProvider, model: defaultModel }
+  : null;
 
 const fastify = Fastify({ logger: false, bodyLimit: 100 * 1024 * 1024 });
 
-// Health check endpoint
+// startedAt captured at module load = process birth time
+const startedAt = Date.now();
+
+// Health check - returns pid + startedAt so CLI can cross-verify against PID lock
 fastify.get("/healthz", async () => ({
   ok: true,
+  pid: process.pid,
+  startedAt,
   active: active ?? { provider: "glm", model: "auto" }
 }));
 
@@ -110,18 +128,88 @@ fastify.post("/google/logout", async () => {
   return { ok: true, message: "Logged out of Google" };
 });
 
+// ── OpenAI/Codex OAuth endpoints ──────────────────────────────────────
+
+// Landing page with sign-in button
+fastify.get("/codex/login", async (_req, reply) => {
+  reply.type("text/html").send(codexLoginPage());
+});
+
+// Start OAuth flow (redirects to OpenAI)
+fastify.get("/codex/login/start", async (_req, reply) => {
+  const authUrl = buildCodexLoginUrl(PORT);
+  reply.redirect(authUrl);
+});
+
+// OAuth callback (receives auth code from OpenAI)
+fastify.get("/codex/callback", async (req, reply) => {
+  const query = req.query as Record<string, string>;
+  const { code, state, error } = query;
+
+  if (error) {
+    return reply.type("text/html").code(400).send(
+      `<html><body style="font-family:system-ui;text-align:center;padding:60px;background:#0f172a;color:#e2e8f0;">
+        <h1 style="color:#f87171;">Login Failed</h1><p>${error}</p>
+        <a href="/codex/login" style="color:#60a5fa;">Try again</a>
+      </body></html>`
+    );
+  }
+
+  if (!code || !state) {
+    return reply.type("text/html").code(400).send(
+      `<html><body style="font-family:system-ui;text-align:center;padding:60px;background:#0f172a;color:#e2e8f0;">
+        <h1 style="color:#f87171;">Missing Parameters</h1><p>No authorization code received.</p>
+        <a href="/codex/login" style="color:#60a5fa;">Try again</a>
+      </body></html>`
+    );
+  }
+
+  try {
+    const tokens = await handleCodexOAuthCallback(code, state);
+    reply.type("text/html").send(
+      `<html><body style="font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#0f172a;">
+        <div style="text-align:center;color:#e2e8f0;max-width:500px;">
+          <div style="font-size:48px;">&#10003;</div>
+          <h1 style="color:#4ade80;">OpenAI Authenticated</h1>
+          <p>Logged in as: <strong>${tokens.email || "unknown"}</strong></p>
+          <p>Plan: <strong style="color:#a78bfa;">${tokens.plan || "unknown"}</strong></p>
+          <p style="color:#64748b;margin-top:24px;">You can close this window.<br>Use <code style="background:#1e293b;padding:2px 8px;border-radius:4px;">codex</code> as your model in Claude Code.</p>
+        </div>
+      </body></html>`
+    );
+  } catch (e: any) {
+    reply.type("text/html").code(500).send(
+      `<html><body style="font-family:system-ui;text-align:center;padding:60px;background:#0f172a;color:#e2e8f0;">
+        <h1 style="color:#f87171;">Login Failed</h1><p>${e.message}</p>
+        <a href="/codex/login" style="color:#60a5fa;">Try again</a>
+      </body></html>`
+    );
+  }
+});
+
+// Codex login status
+fastify.get("/codex/status", async () => {
+  return getCodexLoginStatus();
+});
+
+// Codex logout
+fastify.post("/codex/logout", async () => {
+  await codexLogout();
+  return { ok: true, message: "Logged out of OpenAI" };
+});
+
 // Main messages endpoint - routes by model prefix
 fastify.post("/v1/messages", async (req, res) => {
   try {
     const body = req.body as AnthropicRequest;
     const defaults = active ?? undefined;
-    const { provider, model } = parseProviderModel(body.model, defaults);
+    const { provider, model, reasoning } = parseProviderModel(body.model, defaults);
 
     // Log every request for debugging
     const tools = body.tools?.map((t: any) => t.name).join(",") || "none";
     const hasSystem = !!body.system;
     const msgCount = body.messages?.length || 0;
-    console.log(`[ccx] REQUEST: model="${body.model}" → provider="${provider}" model="${model}" | tools=[${tools}] system=${hasSystem} messages=${msgCount}`);
+    console.log(`[ccx] REQUEST: model="${body.model}" → provider="${provider}" model="${model}"${reasoning ? ` reasoning=${reasoning}` : ""} | tools=[${tools}] system=${hasSystem} messages=${msgCount}`);
 
     // Warn if using tools with providers that may not support them
     warnIfTools(body, provider);
@@ -137,13 +225,12 @@ fastify.post("/v1/messages", async (req, res) => {
       if (!key) {
         throw apiError(401, "OPENAI_API_KEY not set in ~/.claude-proxy/.env");
       }
-      // Set headers only after validation
       res.raw.setHeader("Content-Type", "text/event-stream");
       res.raw.setHeader("Cache-Control", "no-cache, no-transform");
       res.raw.setHeader("Connection", "keep-alive");
       // @ts-ignore
       res.raw.flushHeaders?.();
-      return chatOpenAI(res, body, model, key);
+      return chatCodexOAuth(res, body, model, key, reasoning);
     }
 
     if (provider === "openrouter") {
@@ -165,7 +252,16 @@ fastify.post("/v1/messages", async (req, res) => {
       res.raw.setHeader("Connection", "keep-alive");
       // @ts-ignore
       res.raw.flushHeaders?.();
-      return chatGeminiOAuth(res, body, model);
+      return chatGeminiOAuth(res, body, model, undefined, reasoning);
+    }
+
+    if (provider === "codex-oauth") {
+      res.raw.setHeader("Content-Type", "text/event-stream");
+      res.raw.setHeader("Cache-Control", "no-cache, no-transform");
+      res.raw.setHeader("Connection", "keep-alive");
+      // @ts-ignore
+      res.raw.flushHeaders?.();
+      return chatCodexOAuth(res, body, model, undefined, reasoning);
     }
 
     if (provider === "gemini") {
@@ -178,7 +274,7 @@ fastify.post("/v1/messages", async (req, res) => {
       res.raw.setHeader("Connection", "keep-alive");
       // @ts-ignore
       res.raw.flushHeaders?.();
-      return chatGemini(res, body, model, key);
+      return chatGeminiOAuth(res, body, model, key, reasoning);
     }
 
     if (provider === "anthropic") {
@@ -251,11 +347,18 @@ function apiError(status: number, message: string) {
   return e;
 }
 
+registerCleanup();
+
 fastify
   .listen({ port: PORT, host: "127.0.0.1" })
   .then(async () => {
-    console.log(`[ccx] Proxy listening on http://127.0.0.1:${PORT}`);
+    await writePid();
+    console.log(`[ccx] Proxy listening on http://127.0.0.1:${PORT} (PID ${process.pid})`);
     console.log(`[ccx] Configure API keys in: ${envPath}`);
+
+    if (active) {
+      console.log(`[ccx] Default provider: ${active.provider}:${active.model}`);
+    }
 
     // Show Google login status
     const gStatus = await getLoginStatus();
@@ -263,6 +366,14 @@ fastify
       console.log(`[ccx] Google: logged in as ${gStatus.email || "unknown"} (${gStatus.mode})`);
     } else {
       console.log(`[ccx] Google: not logged in. Visit http://127.0.0.1:${PORT}/google/login to authenticate`);
+    }
+
+    // Show Codex/OpenAI login status
+    const cStatus = await getCodexLoginStatus();
+    if (cStatus.loggedIn) {
+      console.log(`[ccx] OpenAI: logged in as ${cStatus.email || "unknown"} (${cStatus.plan || "unknown"}) via ${cStatus.source}`);
+    } else {
+      console.log(`[ccx] OpenAI: not logged in. Visit http://127.0.0.1:${PORT}/codex/login or use Codex CLI`);
     }
   })
   .catch((err) => {

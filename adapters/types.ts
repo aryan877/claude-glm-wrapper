@@ -28,9 +28,12 @@ export type AnthropicRequest = {
   system?: string;
 };
 
-export type ProviderKey = "openai" | "openrouter" | "gemini" | "gemini-oauth" | "glm" | "anthropic";
+export type ProviderKey = "openai" | "openrouter" | "gemini" | "gemini-oauth" | "codex-oauth" | "glm" | "anthropic";
+
+export type ReasoningLevel = "low" | "medium" | "high" | "xhigh";
 
 export type ProviderModel = {
   provider: ProviderKey;
   model: string;
+  reasoning?: ReasoningLevel;
 };

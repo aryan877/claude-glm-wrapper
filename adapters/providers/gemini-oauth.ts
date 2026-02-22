@@ -3,6 +3,7 @@
 
 import { FastifyReply } from "fastify";
 import { createParser } from "eventsource-parser";
+import type { EventSourceMessage } from "eventsource-parser";
 import { sendEvent } from "../sse.js";
 import { getAccessToken, loadTokens } from "../google-auth.js";
 import type {
@@ -146,10 +147,14 @@ function toGeminiTools(tools: AnthropicTool[]) {
 
 // ── Main adapter ────────────────────────────────────────────────────────
 
+import type { ReasoningLevel } from "../types.js";
+
 export async function chatGeminiOAuth(
   res: FastifyReply,
   body: AnthropicRequest,
-  model: string
+  model: string,
+  apiKey?: string,
+  reasoning?: ReasoningLevel
 ) {
   // Helper to send error as SSE (since headers are already flushed by the gateway)
   function sendSSEError(msg: string) {
@@ -166,7 +171,7 @@ export async function chatGeminiOAuth(
   }
 
   try {
-    return await _chatGeminiOAuthInner(res, body, model);
+    return await _chatGeminiOAuthInner(res, body, model, apiKey, reasoning as ReasoningLevel | undefined);
   } catch (e: any) {
     console.error(`[gemini-oauth] ERROR: ${e.message}`);
     sendSSEError(e.message);
@@ -176,36 +181,61 @@ export async function chatGeminiOAuth(
 async function _chatGeminiOAuthInner(
   res: FastifyReply,
   body: AnthropicRequest,
-  model: string
+  model: string,
+  apiKey?: string,
+  reasoning?: ReasoningLevel
 ) {
-  // Get access token (auto-refreshes if expired)
-  const accessToken = await getAccessToken();
-  const tokens = await loadTokens();
+  // If API key provided, use it directly (no OAuth needed)
+  // Otherwise use OAuth access token (auto-refreshes if expired)
+  const accessToken = apiKey || await getAccessToken();
+  const tokens = apiKey ? null : await loadTokens();
   const projectId = tokens?.project_id;
 
   // Build Gemini request
   const contents = toGeminiContents(body.messages);
 
-  // Generation config matching Gemini CLI defaults for chat
+  // Detect Gemini 3 vs 2.5 models for thinking config
+  const isGemini3 = /^gemini-3(\.|-|$)/.test(model);
+
+  // Build thinking config based on model family
+  // Gemini 3: uses thinkingLevel (LOW/MEDIUM/HIGH)
+  // Gemini 2.5: uses thinkingBudget (number of tokens)
+  let thinkingConfig: any;
+  if (isGemini3) {
+    const THINKING_LEVELS: Record<string, string> = { low: "LOW", medium: "MEDIUM", high: "HIGH", xhigh: "HIGH" };
+    const thinkingLevel = THINKING_LEVELS[reasoning || ""] || "HIGH";
+    thinkingConfig = { includeThoughts: true, thinkingLevel };
+    console.log(`[gemini] Gemini 3 model: thinkingLevel=${thinkingLevel}${reasoning ? ` (${reasoning})` : ""}`);
+  } else {
+    const THINKING_BUDGETS: Record<string, number> = { low: 1024, medium: 8192, high: 32768, xhigh: 65536 };
+    const thinkingBudget = THINKING_BUDGETS[reasoning || ""] || THINKING_BUDGETS.high;
+    thinkingConfig = { includeThoughts: true, thinkingBudget };
+    if (reasoning) {
+      console.log(`[gemini] Gemini 2.5 model: thinkingBudget=${thinkingBudget} (${reasoning})`);
+    }
+  }
+
   const generationConfig: any = {
     temperature: body.temperature ?? 1,
     topP: 0.95,
     topK: 64,
-    thinkingConfig: { includeThoughts: true },
+    thinkingConfig,
   };
   if (body.max_tokens !== undefined) {
     generationConfig.maxOutputTokens = body.max_tokens;
   }
 
-  // Tools
-  const tools =
-    body.tools && body.tools.length > 0 ? toGeminiTools(body.tools) : undefined;
-
-  if (tools) {
+  // Tools: function declarations + Google Search grounding
+  const tools: any[] = [];
+  if (body.tools && body.tools.length > 0) {
+    tools.push(...toGeminiTools(body.tools));
     console.log(
-      `[gemini-oauth] Sending ${body.tools!.length} tools as Gemini function declarations`
+      `[gemini] Sending ${body.tools.length} tools as Gemini function declarations`
     );
   }
+  // Add Google Search grounding tool
+  tools.push({ google_search: {} });
+  console.log(`[gemini] Google Search grounding enabled`);
 
   let url: string;
   let reqBody: any;
@@ -232,7 +262,7 @@ async function _chatGeminiOAuthInner(
       request: {
         contents,
         generationConfig,
-        ...(tools && { tools }),
+        tools,
       },
     };
     console.log(
@@ -245,30 +275,38 @@ async function _chatGeminiOAuthInner(
       : undefined;
 
     url = `${GL_ENDPOINT}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`;
+    // API key auth appends key to URL instead of using Bearer token
+    if (apiKey) {
+      url += `&key=${apiKey}`;
+    }
     reqBody = {
       contents,
       ...(systemInstruction && { systemInstruction }),
       generationConfig,
-      ...(tools && { tools }),
+      tools,
     };
-    console.log(`[gemini-oauth] Standard API | model="${model}"`);
+    console.log(`[gemini] Standard API | model="${model}" auth=${apiKey ? "api-key" : "oauth"}`);
   }
 
   // Log outgoing request for debugging
   const reqJson = JSON.stringify(reqBody);
-  console.log(`[gemini-oauth] REQUEST URL: ${url}`);
-  console.log(`[gemini-oauth] REQUEST BODY (${reqJson.length} bytes): ${reqJson.slice(0, 500)}...`);
+  console.log(`[gemini] REQUEST URL: ${url.replace(/key=[^&]+/, "key=***")}`);
+  console.log(`[gemini] REQUEST BODY (${reqJson.length} bytes): ${reqJson.slice(0, 500)}...`);
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  // Only add Bearer auth when using OAuth (not API key)
+  if (!apiKey) {
+    headers["Authorization"] = `Bearer ${accessToken}`;
+    headers["User-Agent"] = "google-api-nodejs-client/9.15.1";
+    headers["X-Goog-Api-Client"] = "gl-node/22.17.0";
+    headers["Client-Metadata"] = "ideType=IDE_UNSPECIFIED,platform=PLATFORM_UNSPECIFIED,pluginType=GEMINI";
+  }
 
   const resp = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-      // Required headers matching Gemini CLI client identity
-      "User-Agent": "google-api-nodejs-client/9.15.1",
-      "X-Goog-Api-Client": "gl-node/22.17.0",
-      "Client-Metadata": "ideType=IDE_UNSPECIFIED,platform=PLATFORM_UNSPECIFIED,pluginType=GEMINI",
-    },
+    headers,
     body: reqJson,
   });
 
@@ -357,50 +395,52 @@ async function _chatGeminiOAuthInner(
 
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
-  const parser = createParser({ onEvent: (event: any) => {
-    const data = event.data;
-    if (!data) return;
-    try {
-      const json = JSON.parse(data);
+  const parser = createParser({
+    onEvent(event: EventSourceMessage) {
+      const data = event.data;
+      if (!data) return;
+      try {
+        const json = JSON.parse(data);
 
-      // Handle both Code Assist (wrapped) and standard API (unwrapped) responses
-      const candidateData = json.response || json;
-      const candidate = candidateData?.candidates?.[0];
-      if (!candidate?.content?.parts) return;
+        // Handle both Code Assist (wrapped) and standard API (unwrapped) responses
+        const candidateData = json.response || json;
+        const candidate = candidateData?.candidates?.[0];
+        if (!candidate?.content?.parts) return;
 
-      for (const part of candidate.content.parts) {
-        // Handle thinking/reasoning (Gemini 2.5+ models)
-        if (part.thought === true && part.text) {
-          ensureThinkingBlockStarted();
-          sendEvent(res, "content_block_delta", {
-            type: "content_block_delta",
-            index: contentIndex,
-            delta: { type: "thinking_delta", thinking: part.text },
-          });
-        }
-        // Handle regular text
-        else if (part.text && part.thought !== true) {
-          ensureContentBlockStarted();
-          sendEvent(res, "content_block_delta", {
-            type: "content_block_delta",
-            index: contentIndex,
-            delta: { type: "text_delta", text: part.text },
-          });
-        }
+        for (const part of candidate.content.parts) {
+          // Handle thinking/reasoning (Gemini 2.5+ models)
+          if (part.thought === true && part.text) {
+            ensureThinkingBlockStarted();
+            sendEvent(res, "content_block_delta", {
+              type: "content_block_delta",
+              index: contentIndex,
+              delta: { type: "thinking_delta", thinking: part.text },
+            });
+          }
+          // Handle regular text
+          else if (part.text && part.thought !== true) {
+            ensureContentBlockStarted();
+            sendEvent(res, "content_block_delta", {
+              type: "content_block_delta",
+              index: contentIndex,
+              delta: { type: "text_delta", text: part.text },
+            });
+          }
 
-        // Handle function calls
-        if (part.functionCall) {
-          pendingToolCalls.push({
-            id: `toolu_${crypto.randomBytes(12).toString("hex")}`,
-            name: part.functionCall.name,
-            args: part.functionCall.args || {},
-          });
+          // Handle function calls
+          if (part.functionCall) {
+            pendingToolCalls.push({
+              id: `toolu_${crypto.randomBytes(12).toString("hex")}`,
+              name: part.functionCall.name,
+              args: part.functionCall.args || {},
+            });
+          }
         }
+      } catch {
+        // ignore parse errors in SSE stream
       }
-    } catch {
-      // ignore parse errors in SSE stream
-    }
-  }});
+    },
+  });
 
   while (true) {
     const { value, done } = await reader.read();

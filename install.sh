@@ -1,14 +1,14 @@
 #!/bin/bash
-# Claude-GLM Server-Friendly Installer
+# Claude Proxy Server-Friendly Installer
 # Works without sudo, installs to user's home directory
 #
 # Usage:
 #   Test error reporting:
-#     CLAUDE_GLM_TEST_ERROR=1 bash <(curl -fsSL https://raw.githubusercontent.com/JoeInnsp23/claude-glm-wrapper/main/install.sh)
+#     CLAUDE_GLM_TEST_ERROR=1 bash <(curl -fsSL https://raw.githubusercontent.com/aryan877/claude-proxy/main/install.sh)
 #     OR: ./install.sh --test-error
 #
 #   Enable debug mode:
-#     CLAUDE_GLM_DEBUG=1 bash <(curl -fsSL https://raw.githubusercontent.com/JoeInnsp23/claude-glm-wrapper/main/install.sh)
+#     CLAUDE_GLM_DEBUG=1 bash <(curl -fsSL https://raw.githubusercontent.com/aryan877/claude-proxy/main/install.sh)
 #     OR: ./install.sh --debug
 
 # Parse command-line arguments
@@ -86,7 +86,7 @@ report_error() {
 
     if [ "$report_choice" != "y" ] && [ "$report_choice" != "Y" ]; then
         echo "Error not reported. You can get help at:"
-        echo "  https://github.com/JoeInnsp23/claude-glm-wrapper/issues"
+        echo "  https://github.com/aryan877/claude-proxy/issues"
         echo ""
         echo "Press Enter to finish..."
         read
@@ -150,7 +150,7 @@ $sanitized_error
         encoded_title="Installation%20Error%3A%20Unix%2FLinux%2FmacOS"
     fi
 
-    local issue_url="https://github.com/JoeInnsp23/claude-glm-wrapper/issues/new?title=${encoded_title}&body=${encoded_body}&labels=bug,unix,installation"
+    local issue_url="https://github.com/aryan877/claude-proxy/issues/new?title=${encoded_title}&body=${encoded_body}&labels=bug,unix,installation"
 
     echo "📋 Error details have been prepared for reporting."
     echo ""
@@ -779,8 +779,8 @@ check_claude_installation() {
 
 # Main installation
 main() {
-    echo "🔧 Claude-GLM Server-Friendly Installer"
-    echo "========================================"
+    echo "🔧 Claude Proxy Server-Friendly Installer"
+    echo "=========================================="
     echo ""
     echo "This installer:"
     echo "  • Does NOT require sudo/root access"
@@ -960,7 +960,7 @@ if [ "$TEST_ERROR" = true ]; then
     echo "✅ Test complete. If a browser window opened, error reporting is working!"
     echo ""
     echo "To run normal installation, use:"
-    echo "   curl -fsSL https://raw.githubusercontent.com/JoeInnsp23/claude-glm-wrapper/main/install.sh | bash"
+    echo "   curl -fsSL https://raw.githubusercontent.com/aryan877/claude-proxy/main/install.sh | bash"
     echo ""
     echo "Press Enter to finish (window will remain open)..."
     read
