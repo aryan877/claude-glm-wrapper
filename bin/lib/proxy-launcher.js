@@ -38,6 +38,7 @@ export async function launchProxy({ rootDir, provider, model, defaultModel, star
   const PORT = Number(process.env.CLAUDE_PROXY_PORT || 17870);
 
   // Step 1: Check if a healthy proxy is already running
+  // If /healthz responds, it's our proxy — no random process would have that endpoint.
   const health = await fetchHealth(PORT);
 
   if (health && !forceRestart) {
@@ -53,6 +54,7 @@ export async function launchProxy({ rootDir, provider, model, defaultModel, star
         await new Promise(r => setTimeout(r, 300));
       }
     } else {
+      // No health response — check for zombie from lock file
       const lock = await readLock();
       if (lock?.pid && isAlive(lock.pid)) {
         console.log(`  Stale proxy detected (PID ${lock.pid}, not responding). Killing...`);
