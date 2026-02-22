@@ -83,11 +83,16 @@ async function main() {
   console.log("  Thinking levels (append @level to any model):");
   console.log("  ─────────────────────────────────────────────");
   console.log("    gemini@low     Low thinking");
-  console.log("    gemini@medium  Medium (→ HIGH on 3-pro)  (default for 3.1+)");
   console.log("    gemini@high    Full thinking              (default)");
-  console.log("    gemini@xhigh   Full thinking");
+  console.log("  3.1/Flash only:");
+  console.log("    gemini-flash@medium   Medium thinking");
+  console.log("  2.5 models (token budget):");
+  console.log("    gemini-25p@low     1K tokens");
+  console.log("    gemini-25p@medium  8K tokens");
+  console.log("    gemini-25p@high    32K tokens             (default)");
+  console.log("    gemini-25p@xhigh   65K tokens");
   console.log("");
-  console.log("  Examples: /model gemini-flash@low  /model gemini@xhigh");
+  console.log("  Examples: /model gemini-flash@low  /model gemini-25p@xhigh");
   console.log("");
 
   // Extra flags
