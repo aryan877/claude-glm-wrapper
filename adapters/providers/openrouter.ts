@@ -113,7 +113,10 @@ export async function chatOpenRouter(
 
   // Add system message if present
   if (body.system) {
-    messages.unshift({ role: "system", content: body.system });
+    const sysText = Array.isArray(body.system)
+      ? (body.system as any[]).map((b: any) => b.text ?? "").join("\n")
+      : body.system;
+    messages.unshift({ role: "system", content: sysText });
   }
 
   const reqBody: any = {

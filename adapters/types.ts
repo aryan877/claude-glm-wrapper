@@ -25,7 +25,7 @@ export type AnthropicRequest = {
   temperature?: number;
   stream?: boolean;
   tools?: AnthropicTool[];
-  system?: string;
+  system?: string | Array<{ type: string; text: string }>;
 };
 
 export type ProviderKey = "openai" | "openrouter" | "gemini" | "gemini-oauth" | "codex-oauth" | "glm" | "anthropic";

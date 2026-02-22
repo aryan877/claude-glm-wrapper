@@ -193,9 +193,14 @@ async function _chatCodexOAuthInner(
     // Add web search tool (ChatGPT backend uses "web_search")
     tools.push({ type: "web_search" });
 
+    // system can be a string or array of {type:"text",text:"..."} objects
+    const instructions = Array.isArray(body.system)
+      ? (body.system as any[]).map((b: any) => b.text ?? "").join("\n")
+      : (body.system || "");
+
     reqBody = {
       model,
-      instructions: body.system || "",
+      instructions,
       input,
       tools,
       stream: true,
@@ -211,7 +216,10 @@ async function _chatCodexOAuthInner(
     // ── Chat Completions API (for API key users) ──
     const messages = toOpenAIMessagesFromAnthropic(body.messages);
     if (body.system) {
-      messages.unshift({ role: "system", content: body.system });
+      const sysText = Array.isArray(body.system)
+        ? (body.system as any[]).map((b: any) => b.text ?? "").join("\n")
+        : body.system;
+      messages.unshift({ role: "system", content: sysText });
     }
 
     reqBody = {

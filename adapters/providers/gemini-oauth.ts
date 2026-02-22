@@ -244,12 +244,15 @@ async function _chatGeminiOAuthInner(
     // Code Assist API - systemInstruction has a different protobuf schema,
     // so prepend system prompt to first user message instead
     if (body.system) {
+      const sysText = Array.isArray(body.system)
+        ? (body.system as any[]).map((b: any) => b.text ?? "").join("\n")
+        : body.system;
       if (contents.length > 0 && contents[0].role === "user") {
-        contents[0].parts.unshift({ text: `[System Instructions]\n${body.system}\n[End System Instructions]\n\n` });
+        contents[0].parts.unshift({ text: `[System Instructions]\n${sysText}\n[End System Instructions]\n\n` });
       } else {
         contents.unshift({
           role: "user",
-          parts: [{ text: `[System Instructions]\n${body.system}\n[End System Instructions]` }],
+          parts: [{ text: `[System Instructions]\n${sysText}\n[End System Instructions]` }],
         });
       }
     }
@@ -270,8 +273,11 @@ async function _chatGeminiOAuthInner(
     );
   } else {
     // Standard Generative Language API - systemInstruction works natively
-    const systemInstruction = body.system
-      ? { role: "user", parts: [{ text: body.system }] }
+    const sysTextStd = Array.isArray(body.system)
+      ? (body.system as any[]).map((b: any) => b.text ?? "").join("\n")
+      : body.system;
+    const systemInstruction = sysTextStd
+      ? { role: "user", parts: [{ text: sysTextStd }] }
       : undefined;
 
     url = `${GL_ENDPOINT}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`;
