@@ -22,11 +22,11 @@ if (!isNpxInstall && !isTempInstall) {
   console.error('\n❌ ERROR: Incorrect installation method!\n');
   console.error('This package is meant to be run directly with npx only.\n');
   console.error('✅ Correct usage:');
-  console.error('   npx claude-proxy\n');
+  console.error('   npx claude-proxy-ai\n');
   console.error('❌ Do NOT install this package:');
-  console.error('   npm install claude-proxy');
-  console.error('   npm i claude-proxy');
-  console.error('   npm install -g claude-proxy\n');
+  console.error('   npm install claude-proxy-ai');
+  console.error('   npm i claude-proxy-ai');
+  console.error('   npm install -g claude-proxy-ai\n');
   console.error('Always use npx to run the latest version!\n');
 
   process.exit(1);

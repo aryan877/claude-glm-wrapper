@@ -22,7 +22,7 @@ No API key needed — uses your ChatGPT Plus subscription via OAuth.
 
 ```bash
 # Install
-npm install -g claude-proxy
+npm install -g claude-proxy-ai
 
 # Run
 claude-codex
@@ -38,12 +38,12 @@ No API key needed — uses Google OAuth with Code Assist API.
 claude-gemini
 ```
 
-### Option 3: `npx claude-proxy` (GLM installer)
+### Option 3: `npx claude-proxy-ai` (GLM installer)
 
 For Z.AI GLM models with an API key:
 
 ```bash
-npx claude-proxy
+npx claude-proxy-ai
 ```
 
 This runs the interactive installer that sets up wrapper scripts and shell aliases.
