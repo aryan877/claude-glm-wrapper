@@ -219,8 +219,7 @@ export async function chatOpenRouter(
 
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
-  const parser = createParser((event) => {
-    if (event.type !== "event") return;
+  const parser = createParser({ onEvent: (event: any) => {
     const data = event.data;
     if (!data || data === "[DONE]") return;
     try {
@@ -268,7 +267,7 @@ export async function chatOpenRouter(
     } catch {
       // ignore parse errors
     }
-  });
+  }});
 
   while (true) {
     const { value, done } = await reader.read();

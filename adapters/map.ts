@@ -10,6 +10,7 @@ const PROVIDER_PREFIXES: ProviderKey[] = [
   "openai",
   "openrouter",
   "gemini",
+  "gemini-oauth",
   "glm",
   "anthropic",
 ];
@@ -32,6 +33,15 @@ const MODEL_SHORTCUTS: Record<string, string> = {
   opus: "anthropic:claude-opus-4-5-20251101",
   sonnet: "anthropic:claude-sonnet-4-5-20250929",
   haiku: "anthropic:claude-haiku-4-5-20251001",
+  // Gemini OAuth shortcuts (Google account login)
+  go: "gemini-oauth:gemini-3-pro-preview",
+  gp: "gemini-oauth:gemini-3-pro-preview",
+  g3: "gemini-oauth:gemini-3-pro-preview",
+  "gemini-pro": "gemini-oauth:gemini-3-pro-preview",
+  gf: "gemini-oauth:gemini-3-flash-preview",
+  "gemini-flash": "gemini-oauth:gemini-3-flash-preview",
+  "g25p": "gemini-oauth:gemini-2.5-pro",
+  "g25f": "gemini-oauth:gemini-2.5-flash",
   // Add more shortcuts as needed
 };
 
@@ -91,8 +101,8 @@ export function warnIfTools(
   provider: ProviderKey,
 ): void {
   if (req.tools && req.tools.length > 0) {
-    // Only GLM and Anthropic support tools natively
-    if (provider !== "glm" && provider !== "anthropic") {
+    // GLM, Anthropic, and Gemini OAuth support tools natively
+    if (provider !== "glm" && provider !== "anthropic" && provider !== "gemini-oauth") {
       console.warn(
         `[proxy] Warning: ${provider} may not fully support Anthropic-style tools. Passing through anyway.`,
       );

@@ -28,7 +28,7 @@ export type AnthropicRequest = {
   system?: string;
 };
 
-export type ProviderKey = "openai" | "openrouter" | "gemini" | "glm" | "anthropic";
+export type ProviderKey = "openai" | "openrouter" | "gemini" | "gemini-oauth" | "glm" | "anthropic";
 
 export type ProviderModel = {
   provider: ProviderKey;

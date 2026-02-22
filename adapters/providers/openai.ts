@@ -52,8 +52,7 @@ export async function chatOpenAI(
 
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
-  const parser = createParser((event) => {
-    if (event.type !== "event") return;
+  const parser = createParser({ onEvent: (event: any) => {
     const data = event.data;
     if (!data || data === "[DONE]") return;
     try {
@@ -63,7 +62,7 @@ export async function chatOpenAI(
     } catch {
       // ignore parse errors on keepalives, etc.
     }
-  });
+  }});
 
   while (true) {
     const { value, done } = await reader.read();
