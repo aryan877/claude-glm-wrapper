@@ -3,264 +3,149 @@
 # Works without sudo, installs to user's home directory
 #
 # Usage:
-#   Test error reporting:
-#     CLAUDE_GLM_TEST_ERROR=1 bash <(curl -fsSL https://raw.githubusercontent.com/aryan877/claude-proxy/main/install.sh)
-#     OR: ./install.sh --test-error
-#
-#   Enable debug mode:
-#     CLAUDE_GLM_DEBUG=1 bash <(curl -fsSL https://raw.githubusercontent.com/aryan877/claude-proxy/main/install.sh)
-#     OR: ./install.sh --debug
-
-# Parse command-line arguments
-TEST_ERROR=false
-DEBUG=false
-
-for arg in "$@"; do
-    case $arg in
-        --test-error)
-            TEST_ERROR=true
-            shift
-            ;;
-        --debug)
-            DEBUG=true
-            shift
-            ;;
-        *)
-            # Unknown option
-            ;;
-    esac
-done
-
-# Support environment variables for parameters
-if [ "$CLAUDE_GLM_TEST_ERROR" = "1" ] || [ "$CLAUDE_GLM_TEST_ERROR" = "true" ]; then
-    TEST_ERROR=true
-fi
-
-if [ "$CLAUDE_GLM_DEBUG" = "1" ] || [ "$CLAUDE_GLM_DEBUG" = "true" ]; then
-    DEBUG=true
-fi
+#   bash <(curl -fsSL https://raw.githubusercontent.com/aryan877/claude-proxy/main/install.sh)
+#   ./install.sh
 
 # Configuration
 USER_BIN_DIR="$HOME/.local/bin"
-GLM_CONFIG_DIR="$HOME/.claude-glm"
-GLM_45_CONFIG_DIR="$HOME/.claude-glm-45"
-GLM_FAST_CONFIG_DIR="$HOME/.claude-glm-fast"
 ZAI_API_KEY="YOUR_ZAI_API_KEY_HERE"
 
-# Report installation errors to GitHub
-report_error() {
-    local error_msg="$1"
-    local error_line="$2"
-    local error_code="$3"
+# ── Helpers ──────────────────────────────────────────────────────────
 
-    echo ""
-    echo "============================================="
-    echo "❌ Installation failed!"
-    echo "============================================="
-    echo ""
+# Detect the user's primary shell rc file.
+#
+# A user CAN have multiple rc files (e.g. both ~/.bashrc and ~/.bash_profile),
+# but we only write to ONE — the one their shell actually sources on startup.
+#
+# Why pick just one?
+#   - Writing to multiple would cause duplicate PATH entries and aliases
+#   - Each shell has a clear "primary" config that always gets sourced:
+#       bash interactive: ~/.bashrc  (but macOS Terminal sources ~/.bash_profile instead)
+#       zsh:              ~/.zshrc   (always sourced for interactive shells)
+#       ksh:              ~/.kshrc   (but falls back to ~/.profile on some systems)
+#
+# The $SHELL env var tells us which shell the user has set as their login shell,
+# NOT which shell is running this script (this script always runs in bash via #!/bin/bash).
+detect_shell_rc() {
+    # Extract just the shell name: "/bin/zsh" → "zsh", "/usr/local/bin/bash" → "bash"
+    local shell_name=$(basename "$SHELL")
+    local rc_file=""
 
-    # Collect system information
-    local os_info="$(uname -s) $(uname -r) ($(uname -m))"
-    local shell_info="bash $BASH_VERSION"
-    local timestamp=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+    case "$shell_name" in
+        bash)
+            # Default to .bashrc (sourced by interactive non-login shells)
+            rc_file="$HOME/.bashrc"
+            # But if .bash_profile exists, prefer it — macOS Terminal opens login shells,
+            # which source .bash_profile but NOT .bashrc (unless .bash_profile sources it)
+            [ -f "$HOME/.bash_profile" ] && rc_file="$HOME/.bash_profile"
+            ;;
+        zsh)
+            # .zshrc is sourced by every interactive zsh shell (login or not)
+            rc_file="$HOME/.zshrc"
+            ;;
+        ksh)
+            rc_file="$HOME/.kshrc"
+            # Some ksh setups only source .profile (especially on older systems)
+            [ -f "$HOME/.profile" ] && rc_file="$HOME/.profile"
+            ;;
+        csh|tcsh)
+            rc_file="$HOME/.cshrc"
+            ;;
+        *)
+            # Unknown shell — .profile is the POSIX standard fallback
+            rc_file="$HOME/.profile"
+            ;;
+    esac
 
-    # Sanitize error message (remove API keys)
-    local sanitized_error=$(echo "$error_msg" | sed \
-        -e 's/ANTHROPIC_AUTH_TOKEN="[^"]*"/ANTHROPIC_AUTH_TOKEN="[REDACTED]"/g' \
-        -e 's/ZAI_API_KEY="[^"]*"/ZAI_API_KEY="[REDACTED]"/g' \
-        -e 's/\$ZAI_API_KEY="[^"]*"/\$ZAI_API_KEY="[REDACTED]"/g')
+    # Return the path by printing it (caller captures with $(...))
+    echo "$rc_file"
+}
 
-    # Display error details to user
-    echo "Error Details:"
-    echo "$sanitized_error"
-    if [ -n "$error_line" ]; then
-        echo "Location: $error_line"
-    fi
-    echo ""
+# Ensure user bin directory exists and is in PATH
+setup_user_bin() {
+    # Create ~/.local/bin if it doesn't exist (-p = no error if already there)
+    mkdir -p "$USER_BIN_DIR"
 
-    # Ask if user wants to report the error
-    echo "Would you like to report this error to GitHub?"
-    echo "This will open your browser with a pre-filled issue report."
-    read -p "Report error? (y/n): " report_choice
-    echo ""
+    # Detect which shell config file to modify (~/.zshrc, ~/.bashrc, etc.)
+    local rc_file=$(detect_shell_rc)
 
-    if [ "$report_choice" != "y" ] && [ "$report_choice" != "Y" ]; then
-        echo "Error not reported. You can get help at:"
-        echo "  https://github.com/aryan877/claude-proxy/issues"
-        echo ""
-        echo "Press Enter to finish..."
-        read
-        return
-    fi
+    # Check if $USER_BIN_DIR is already in PATH.
+    # PATH is colon-delimited: "/usr/bin:/usr/local/bin:/home/user/.local/bin"
+    # We wrap both sides with ":" so the pattern match requires exact segment boundaries:
+    #   ":$PATH:"          → ":/usr/bin:/usr/local/bin:"   (adds delimiters at edges)
+    #   ":$USER_BIN_DIR:"  → ":/home/user/.local/bin:"     (what we're looking for)
+    # Without wrapping, "/home/user/.local/bin2" would falsely match "/home/user/.local/bin"
+    if [[ ":$PATH:" != *":$USER_BIN_DIR:"* ]]; then
+        echo "📝 Adding $USER_BIN_DIR to PATH in $rc_file"
 
-    # Get additional context
-    local claude_found="No"
-    if command -v claude &> /dev/null; then
-        claude_found="Yes ($(which claude))"
-    fi
-
-    # Build error report
-    local issue_body="## Installation Error (Unix/Linux/macOS)
-
-**OS:** $os_info
-**Shell:** $shell_info
-**Timestamp:** $timestamp
-
-### Error Details:
-\`\`\`
-$sanitized_error
-\`\`\`
-"
-
-    if [ -n "$error_line" ]; then
-        issue_body+="
-**Error Location:** $error_line
-"
-    fi
-
-    if [ -n "$error_code" ]; then
-        issue_body+="
-**Exit Code:** $error_code
-"
-    fi
-
-    issue_body+="
-### System Information:
-- Installation Location: $USER_BIN_DIR
-- Claude Code Found: $claude_found
-- PATH: \`$(echo $PATH | sed 's/:/\n  /g')\`
-
----
-*This error was automatically reported by the installer. Please add any additional context below.*
-"
-
-    # URL encode using Python (most compatible)
-    local encoded_body=""
-    local encoded_title=""
-
-    if command -v python3 &> /dev/null; then
-        encoded_body=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$issue_body'''))" 2>/dev/null)
-        encoded_title=$(python3 -c "import urllib.parse; print(urllib.parse.quote('Installation Error: Unix/Linux/macOS'))" 2>/dev/null)
-    elif command -v python &> /dev/null; then
-        encoded_body=$(python -c "import urllib; print urllib.quote('''$issue_body''')" 2>/dev/null)
-        encoded_title=$(python -c "import urllib; print urllib.quote('Installation Error: Unix/Linux/macOS')" 2>/dev/null)
-    else
-        # Fallback: basic URL encoding with sed
-        encoded_body=$(echo "$issue_body" | sed 's/ /%20/g; s/\n/%0A/g')
-        encoded_title="Installation%20Error%3A%20Unix%2FLinux%2FmacOS"
-    fi
-
-    local issue_url="https://github.com/aryan877/claude-proxy/issues/new?title=${encoded_title}&body=${encoded_body}&labels=bug,unix,installation"
-
-    echo "📋 Error details have been prepared for reporting."
-    echo ""
-
-    # Try to open in browser
-    local browser_opened=false
-    if command -v xdg-open &> /dev/null; then
-        if xdg-open "$issue_url" 2>/dev/null; then
-            browser_opened=true
-            echo "✅ Browser opened with pre-filled error report."
+        # csh/tcsh uses "setenv VAR value" syntax instead of "export VAR=value"
+        if [[ "$rc_file" == *".cshrc" ]]; then
+            # Appends: setenv PATH $PATH:/home/user/.local/bin
+            # \$PATH is escaped so the literal string "$PATH" is written to the file
+            # (it will be expanded when the user's shell sources .cshrc later)
+            echo "setenv PATH \$PATH:$USER_BIN_DIR" >> "$rc_file"
+        else
+            # Appends: export PATH="$PATH:/home/user/.local/bin"
+            # \$PATH → writes literal "$PATH" into the file (expanded at source-time)
+            # \"     → writes literal quotes into the file (protects paths with spaces)
+            # $USER_BIN_DIR is expanded NOW to bake in the actual directory path
+            echo "export PATH=\"\$PATH:$USER_BIN_DIR\"" >> "$rc_file"
         fi
-    elif command -v open &> /dev/null; then
-        if open "$issue_url" 2>/dev/null; then
-            browser_opened=true
-            echo "✅ Browser opened with pre-filled error report."
-        fi
-    fi
 
-    if [ "$browser_opened" = false ]; then
-        echo "⚠️  Could not open browser automatically."
+        # Remind user to reload — the PATH change only takes effect in new shells
+        # or after manually sourcing the rc file
         echo ""
-        echo "Please copy and open this URL manually:"
-        echo "$issue_url"
+        echo "⚠️  IMPORTANT: You will need to run this command after installation:"
+        echo "   source $rc_file"
+        echo ""
     fi
-
-    echo ""
-
-    # Add instructions and wait for user
-    if [ "$browser_opened" = true ]; then
-        echo "Please review the error report in your browser and submit the issue."
-        echo "After submitting (or if you choose not to), return here."
-    fi
-
-    echo ""
-    echo "Press Enter to continue..."
-    read
 }
 
 # Find all existing wrapper installations
 find_all_installations() {
-    local locations=(
-        "/usr/local/bin"
-        "/usr/bin"
-        "$HOME/.local/bin"
-        "$HOME/bin"
-    )
-
+    local locations=("/usr/local/bin" "/usr/bin" "$HOME/.local/bin" "$HOME/bin")
     local found_files=()
-
     for location in "${locations[@]}"; do
         if [ -d "$location" ]; then
-            # Find all claude-glm* files in this location
             while IFS= read -r file; do
-                if [ -f "$file" ]; then
-                    found_files+=("$file")
-                fi
+                [ -f "$file" ] && found_files+=("$file")
             done < <(find "$location" -maxdepth 1 -name "claude-glm*" 2>/dev/null)
         fi
     done
-
-    # Return found files (print them)
     printf '%s\n' "${found_files[@]}"
 }
 
 # Clean up old wrapper installations
 cleanup_old_wrappers() {
-    local current_location="$USER_BIN_DIR"
     local all_wrappers=($(find_all_installations))
+    [ ${#all_wrappers[@]} -eq 0 ] && return 0
 
-    if [ ${#all_wrappers[@]} -eq 0 ]; then
-        return 0
-    fi
-
-    # Separate current location files from old ones
     local old_wrappers=()
     local current_wrappers=()
-
     for wrapper in "${all_wrappers[@]}"; do
-        if [[ "$wrapper" == "$current_location"* ]]; then
+        if [[ "$wrapper" == "$USER_BIN_DIR"* ]]; then
             current_wrappers+=("$wrapper")
         else
             old_wrappers+=("$wrapper")
         fi
     done
 
-    # If no old wrappers found, nothing to clean
-    if [ ${#old_wrappers[@]} -eq 0 ]; then
-        return 0
-    fi
+    [ ${#old_wrappers[@]} -eq 0 ] && return 0
 
     echo ""
     echo "🔍 Found existing wrappers in multiple locations:"
     echo ""
-
     for wrapper in "${old_wrappers[@]}"; do
         echo "  ❌ $wrapper (old location)"
     done
-
-    if [ ${#current_wrappers[@]} -gt 0 ]; then
-        for wrapper in "${current_wrappers[@]}"; do
-            echo "  ✅ $wrapper (current location)"
-        done
-    fi
+    for wrapper in "${current_wrappers[@]}"; do
+        echo "  ✅ $wrapper (current location)"
+    done
 
     echo ""
     read -p "Would you like to clean up old installations? (y/n): " cleanup_choice
-
     if [[ "$cleanup_choice" == "y" || "$cleanup_choice" == "Y" ]]; then
         echo ""
-        echo "Removing old wrappers..."
         for wrapper in "${old_wrappers[@]}"; do
             if rm "$wrapper" 2>/dev/null; then
                 echo "  ✅ Removed: $wrapper"
@@ -273,448 +158,124 @@ cleanup_old_wrappers() {
     else
         echo ""
         echo "⚠️  Skipping cleanup. Old wrappers may interfere with the new installation."
-        echo "   You may want to manually remove them later."
     fi
-
     echo ""
 }
 
-# Detect shell and rc file
-detect_shell_rc() {
-    local shell_name=$(basename "$SHELL")
-    local rc_file=""
-    
-    case "$shell_name" in
-        bash)
-            rc_file="$HOME/.bashrc"
-            [ -f "$HOME/.bash_profile" ] && rc_file="$HOME/.bash_profile"
-            ;;
-        zsh)
-            rc_file="$HOME/.zshrc"
-            ;;
-        ksh)
-            rc_file="$HOME/.kshrc"
-            [ -f "$HOME/.profile" ] && rc_file="$HOME/.profile"
-            ;;
-        csh|tcsh)
-            rc_file="$HOME/.cshrc"
-            ;;
-        *)
-            rc_file="$HOME/.profile"
-            ;;
-    esac
-    
-    echo "$rc_file"
-}
-
-# Ensure user bin directory exists and is in PATH
-setup_user_bin() {
-    # Create user bin directory
-    mkdir -p "$USER_BIN_DIR"
-    
-    local rc_file=$(detect_shell_rc)
-    
-    # Check if PATH includes user bin
-    if [[ ":$PATH:" != *":$USER_BIN_DIR:"* ]]; then
-        echo "📝 Adding $USER_BIN_DIR to PATH in $rc_file"
-        
-        # Add to PATH based on shell type
-        if [[ "$rc_file" == *".cshrc" ]]; then
-            echo "setenv PATH \$PATH:$USER_BIN_DIR" >> "$rc_file"
-        else
-            echo "export PATH=\"\$PATH:$USER_BIN_DIR\"" >> "$rc_file"
+# Check Claude Code availability
+check_claude_installation() {
+    echo "🔍 Checking Claude Code installation..."
+    if command -v claude &> /dev/null; then
+        echo "✅ Claude Code found at: $(which claude)"
+        return 0
+    else
+        echo "⚠️  Claude Code not found in PATH"
+        echo ""
+        echo "Options:"
+        echo "1. If Claude Code is installed elsewhere, add it to PATH first"
+        echo "2. Install Claude Code from: https://www.anthropic.com/claude-code"
+        echo "3. Continue anyway (wrappers will be created but won't work until claude is available)"
+        echo ""
+        read -p "Continue with installation? (y/n): " continue_choice
+        if [[ "$continue_choice" != "y" && "$continue_choice" != "Y" ]]; then
+            echo "Installation cancelled."
+            exit 1
         fi
-        
-        echo ""
-        echo "⚠️  IMPORTANT: You will need to run this command after installation:"
-        echo "   source $rc_file"
-        echo ""
+        return 1
     fi
 }
 
-# Create the standard GLM-4.7 wrapper
-create_claude_glm_wrapper() {
-    local wrapper_path="$USER_BIN_DIR/claude-glm"
-    
+# ── Single parameterized wrapper creator ─────────────────────────────
+
+# create_wrapper <name> <model> <fast_model> <config_dir> <label> <emoji>
+create_wrapper() {
+    local name="$1"
+    local model="$2"
+    local fast_model="$3"
+    local config_dir="$4"
+    local label="$5"
+    local emoji="$6"
+    local wrapper_path="$USER_BIN_DIR/$name"
+
     cat > "$wrapper_path" << EOF
 #!/bin/bash
-# Claude-GLM - Claude Code with Z.AI GLM-5 (Standard Model)
+# $name - Claude Code with Z.AI $label
 
-# Set Z.AI environment variables
 export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
 export ANTHROPIC_AUTH_TOKEN="$ZAI_API_KEY"
-export ANTHROPIC_MODEL="glm-5"
-export ANTHROPIC_SMALL_FAST_MODEL="glm-4.5-air"
+export ANTHROPIC_MODEL="$model"
+export ANTHROPIC_SMALL_FAST_MODEL="$fast_model"
+export CLAUDE_HOME="\$HOME/$config_dir"
 
-# Use custom config directory to avoid conflicts
-export CLAUDE_HOME="\$HOME/.claude-glm"
-
-# Create config directory if it doesn't exist
 mkdir -p "\$CLAUDE_HOME"
 
-# Create/update settings file with GLM configuration
 cat > "\$CLAUDE_HOME/settings.json" << SETTINGS
 {
   "env": {
     "ANTHROPIC_BASE_URL": "https://api.z.ai/api/anthropic",
     "ANTHROPIC_AUTH_TOKEN": "$ZAI_API_KEY",
-    "ANTHROPIC_MODEL": "glm-5",
-    "ANTHROPIC_SMALL_FAST_MODEL": "glm-4.5-air"
+    "ANTHROPIC_MODEL": "$model",
+    "ANTHROPIC_SMALL_FAST_MODEL": "$fast_model"
   }
 }
 SETTINGS
 
-# Launch Claude Code with custom config
-echo "🚀 Starting Claude Code with GLM-5 (Standard Model)..."
+echo "$emoji Starting Claude Code with $label..."
 echo "📁 Config directory: \$CLAUDE_HOME"
 echo ""
 
-# Check if claude exists
 if ! command -v claude &> /dev/null; then
     echo "❌ Error: 'claude' command not found!"
     echo "Please ensure Claude Code is installed and in your PATH"
     exit 1
 fi
 
-# Run the actual claude command
-claude "\$@"
-EOF
-    
-    chmod +x "$wrapper_path"
-    echo "✅ Installed claude-glm at $wrapper_path"
-}
-
-# Create the GLM-4.5 wrapper
-create_claude_glm_45_wrapper() {
-    local wrapper_path="$USER_BIN_DIR/claude-glm-4.5"
-
-    cat > "$wrapper_path" << EOF
-#!/bin/bash
-# Claude-GLM-4.5 - Claude Code with Z.AI GLM-4.5
-
-# Set Z.AI environment variables
-export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
-export ANTHROPIC_AUTH_TOKEN="$ZAI_API_KEY"
-export ANTHROPIC_MODEL="glm-4.5"
-export ANTHROPIC_SMALL_FAST_MODEL="glm-4.5-air"
-
-# Use custom config directory to avoid conflicts
-export CLAUDE_HOME="\$HOME/.claude-glm-45"
-
-# Create config directory if it doesn't exist
-mkdir -p "\$CLAUDE_HOME"
-
-# Create/update settings file with GLM configuration
-cat > "\$CLAUDE_HOME/settings.json" << SETTINGS
-{
-  "env": {
-    "ANTHROPIC_BASE_URL": "https://api.z.ai/api/anthropic",
-    "ANTHROPIC_AUTH_TOKEN": "$ZAI_API_KEY",
-    "ANTHROPIC_MODEL": "glm-4.5",
-    "ANTHROPIC_SMALL_FAST_MODEL": "glm-4.5-air"
-  }
-}
-SETTINGS
-
-# Launch Claude Code with custom config
-echo "🚀 Starting Claude Code with GLM-4.5..."
-echo "📁 Config directory: \$CLAUDE_HOME"
-echo ""
-
-# Check if claude exists
-if ! command -v claude &> /dev/null; then
-    echo "❌ Error: 'claude' command not found!"
-    echo "Please ensure Claude Code is installed and in your PATH"
-    exit 1
-fi
-
-# Run the actual claude command
 claude "\$@"
 EOF
 
     chmod +x "$wrapper_path"
-    echo "✅ Installed claude-glm-4.5 at $wrapper_path"
+    echo "✅ Installed $name at $wrapper_path"
 }
 
-# Create the fast GLM-4.5-Air wrapper
-create_claude_glm_fast_wrapper() {
-    local wrapper_path="$USER_BIN_DIR/claude-glm-fast"
-    
-    cat > "$wrapper_path" << EOF
-#!/bin/bash
-# Claude-GLM-Fast - Claude Code with Z.AI GLM-4.5-Air (Fast Model)
-
-# Set Z.AI environment variables
-export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
-export ANTHROPIC_AUTH_TOKEN="$ZAI_API_KEY"
-export ANTHROPIC_MODEL="glm-4.5-air"
-export ANTHROPIC_SMALL_FAST_MODEL="glm-4.5-air"
-
-# Use custom config directory to avoid conflicts
-export CLAUDE_HOME="\$HOME/.claude-glm-fast"
-
-# Create config directory if it doesn't exist
-mkdir -p "\$CLAUDE_HOME"
-
-# Create/update settings file with GLM-Air configuration
-cat > "\$CLAUDE_HOME/settings.json" << SETTINGS
-{
-  "env": {
-    "ANTHROPIC_BASE_URL": "https://api.z.ai/api/anthropic",
-    "ANTHROPIC_AUTH_TOKEN": "$ZAI_API_KEY",
-    "ANTHROPIC_MODEL": "glm-4.5-air",
-    "ANTHROPIC_SMALL_FAST_MODEL": "glm-4.5-air"
-  }
-}
-SETTINGS
-
-# Launch Claude Code with custom config
-echo "⚡ Starting Claude Code with GLM-4.5-Air (Fast Model)..."
-echo "📁 Config directory: \$CLAUDE_HOME"
-echo ""
-
-# Check if claude exists
-if ! command -v claude &> /dev/null; then
-    echo "❌ Error: 'claude' command not found!"
-    echo "Please ensure Claude Code is installed and in your PATH"
-    exit 1
-fi
-
-# Run the actual claude command
-claude "\$@"
-EOF
-    
-    chmod +x "$wrapper_path"
-    echo "✅ Installed claude-glm-fast at $wrapper_path"
-}
-
-# Create the Anthropic wrapper
+# Create the Anthropic wrapper (no Z.AI env vars)
 create_claude_anthropic_wrapper() {
     local wrapper_path="$USER_BIN_DIR/claude-anthropic"
-    
     cat > "$wrapper_path" << 'EOF'
 #!/bin/bash
 # Claude-Anthropic - Claude Code with original Anthropic models
 
-# Clear any Z.AI environment variables
 unset ANTHROPIC_BASE_URL
 unset ANTHROPIC_AUTH_TOKEN
 unset ANTHROPIC_MODEL
 unset ANTHROPIC_SMALL_FAST_MODEL
-
-# Use default Claude config directory
 unset CLAUDE_HOME
 
 echo "🚀 Starting Claude Code with Anthropic Claude models..."
 echo ""
 
-# Check if claude exists
 if ! command -v claude &> /dev/null; then
     echo "❌ Error: 'claude' command not found!"
     echo "Please ensure Claude Code is installed and in your PATH"
     exit 1
 fi
 
-# Run the actual claude command
 claude "$@"
 EOF
-    
     chmod +x "$wrapper_path"
     echo "✅ Installed claude-anthropic at $wrapper_path"
-}
-
-# Install ccx multi-provider proxy
-install_ccx() {
-    echo "🔧 Installing ccx (multi-provider proxy)..."
-
-    local ccx_home="$HOME/.claude-proxy"
-    local wrapper_path="$USER_BIN_DIR/ccx"
-
-    # Create ccx home directory
-    mkdir -p "$ccx_home"
-
-    # Copy adapters directory from the npm package
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-    if [ -d "$script_dir/adapters" ]; then
-        echo "  Copying adapters to $ccx_home/adapters..."
-        cp -r "$script_dir/adapters" "$ccx_home/"
-    else
-        echo "⚠️  Warning: adapters directory not found. Proxy may not work."
-    fi
-
-    # Create ccx wrapper script
-    cat > "$wrapper_path" << 'CCXEOF'
-#!/usr/bin/env bash
-set -euo pipefail
-
-ROOT_DIR="$HOME/.claude-proxy"
-ENV_FILE="$ROOT_DIR/.env"
-PORT="${CLAUDE_PROXY_PORT:-17870}"
-
-# Check if --setup flag is provided
-if [ "${1:-}" = "--setup" ]; then
-    echo "Setting up ~/.claude-proxy/.env..."
-    mkdir -p "$ROOT_DIR"
-
-    if [ -f "$ENV_FILE" ]; then
-        echo "Existing .env found. Edit it manually at: $ENV_FILE"
-        exit 0
-    fi
-
-    cat > "$ENV_FILE" << 'EOF'
-# Claude Proxy Configuration
-# Edit this file to add your API keys
-
-# OpenAI (optional)
-OPENAI_API_KEY=
-OPENAI_BASE_URL=https://api.openai.com/v1
-
-# OpenRouter (optional)
-OPENROUTER_API_KEY=
-OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
-OPENROUTER_REFERER=
-OPENROUTER_TITLE=Claude Code via ccx
-
-# Gemini (optional)
-GEMINI_API_KEY=
-GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta
-
-# Z.AI GLM (optional - for glm: routing)
-GLM_UPSTREAM_URL=https://api.z.ai/api/anthropic
-ZAI_API_KEY=
-
-# Anthropic (optional - for anthropic: routing)
-ANTHROPIC_UPSTREAM_URL=https://api.anthropic.com
-ANTHROPIC_API_KEY=
-ANTHROPIC_VERSION=2023-06-01
-
-# Proxy settings
-CLAUDE_PROXY_PORT=17870
-EOF
-
-    echo "✅ Created $ENV_FILE"
-    echo ""
-    echo "Edit it to add your API keys, then run: ccx"
-    echo ""
-    echo "Example:"
-    echo "  nano $ENV_FILE"
-    exit 0
-fi
-
-# Source the .env file if it exists
-if [ -f "$ENV_FILE" ]; then
-    set -a
-    source "$ENV_FILE"
-    set +a
-fi
-
-export ANTHROPIC_BASE_URL="http://127.0.0.1:${PORT}"
-export ANTHROPIC_AUTH_TOKEN="${ANTHROPIC_AUTH_TOKEN:-local-proxy-token}"
-export ANTHROPIC_MODEL="${ANTHROPIC_MODEL:-glm-5}"
-
-echo "[ccx] Starting Claude Code with multi-provider proxy..."
-echo "[ccx] Proxy will listen on: ${ANTHROPIC_BASE_URL}"
-
-# Check if a proxy is already running on this port
-SHARED_PROXY=false
-if curl -sf "http://127.0.0.1:${PORT}/healthz" >/dev/null 2>&1; then
-    echo "[ccx] Reusing existing proxy on port ${PORT}"
-    SHARED_PROXY=true
-else
-    # Start proxy in background
-    npx -y tsx "${ROOT_DIR}/adapters/anthropic-gateway.ts" > /tmp/claude-proxy.log 2>&1 &
-    PROXY_PID=$!
-
-    cleanup() {
-        echo ""
-        echo "[ccx] Shutting down proxy..."
-        kill ${PROXY_PID} 2>/dev/null || true
-    }
-    trap cleanup EXIT INT TERM
-
-    # Wait for proxy to be ready (health check)
-    echo "[ccx] Waiting for proxy to start..."
-    for i in {1..30}; do
-        if curl -sf "http://127.0.0.1:${PORT}/healthz" >/dev/null 2>&1; then
-            echo "[ccx] Proxy ready!"
-            break
-        fi
-        if [ $i -eq 30 ]; then
-            echo "❌ Proxy failed to start. Check /tmp/claude-proxy.log"
-            cat /tmp/claude-proxy.log
-            exit 1
-        fi
-        sleep 0.5
-    done
-fi
-
-echo ""
-echo "🎯 Available model prefixes:"
-echo "  openai:<model>      - OpenAI models (gpt-4o, gpt-4o-mini, etc.)"
-echo "  openrouter:<model>  - OpenRouter models"
-echo "  gemini:<model>      - Google Gemini models"
-echo "  glm:<model>         - Z.AI GLM models (glm-5, glm-4.7, glm-4.5, etc.)"
-echo "  anthropic:<model>   - Anthropic Claude models"
-echo ""
-echo "💡 Switch models in-session with: /model <prefix>:<model-name>"
-echo ""
-
-# Hand off to Claude Code with glm-5 as default model
-EXTRA_FLAGS=""
-if [[ "\$(basename "\$0")" == "ccxd" ]]; then
-    EXTRA_FLAGS="--dangerously-skip-permissions"
-    echo "⚡ Running with --dangerously-skip-permissions"
-fi
-exec claude --model "\${ANTHROPIC_MODEL:-glm-5}" \$EXTRA_FLAGS "\$@"
-CCXEOF
-
-    chmod +x "$wrapper_path"
-    echo "✅ Installed ccx at $wrapper_path"
-
-    # Create ccxd symlink (dangerous permissions mode)
-    local ccxd_path="${wrapper_path%ccx}ccxd"
-    ln -sf "$wrapper_path" "$ccxd_path"
-    echo "✅ Installed ccxd at $ccxd_path (--dangerously-skip-permissions)"
-
-    # Add ccx alias to shell config
-    add_ccx_alias
-}
-
-# Add ccx alias to shell configuration
-add_ccx_alias() {
-    local rc_file=$(detect_shell_rc)
-
-    if [ -z "$rc_file" ] || [ ! -f "$rc_file" ]; then
-        echo "⚠️  Could not detect shell rc file, skipping ccx alias"
-        return
-    fi
-
-    # Check if alias already exists
-    if grep -q "alias ccx=" "$rc_file" 2>/dev/null; then
-        return
-    fi
-
-    # Add ccx alias
-    if [[ "$rc_file" == *".cshrc" ]]; then
-        echo "alias ccx 'ccx'" >> "$rc_file"
-    else
-        echo "alias ccx='ccx'" >> "$rc_file"
-    fi
 }
 
 # Create shell aliases
 create_shell_aliases() {
     local rc_file=$(detect_shell_rc)
-    
+
     if [ -z "$rc_file" ] || [ ! -f "$rc_file" ]; then
         echo "⚠️  Could not detect shell rc file, skipping aliases"
         return
     fi
-    
+
     # Remove old aliases if they exist
     if grep -q "# Claude Code Model Switcher Aliases" "$rc_file" 2>/dev/null; then
-        # Use temp file for compatibility
         grep -v "# Claude Code Model Switcher Aliases" "$rc_file" | \
         grep -v "alias cc=" | \
         grep -v "alias ccg=" | \
@@ -724,8 +285,7 @@ create_shell_aliases() {
         grep -v "alias claude-glm-d=" > "$rc_file.tmp"
         mv "$rc_file.tmp" "$rc_file"
     fi
-    
-    # Add aliases based on shell type
+
     if [[ "$rc_file" == *".cshrc" ]]; then
         cat >> "$rc_file" << 'EOF'
 
@@ -749,35 +309,51 @@ alias claude-d='claude --dangerously-skip-permissions'
 alias claude-glm-d='claude-glm --dangerously-skip-permissions'
 EOF
     fi
-    
+
     echo "✅ Added aliases to $rc_file"
 }
 
-# Check Claude Code availability
-check_claude_installation() {
-    echo "🔍 Checking Claude Code installation..."
-    
-    if command -v claude &> /dev/null; then
-        echo "✅ Claude Code found at: $(which claude)"
-        return 0
+# ── Error reporting ──────────────────────────────────────────────────
+
+report_error() {
+    local error_msg="$1"
+    local error_line="$2"
+    local error_code="$3"
+
+    echo ""
+    echo "============================================="
+    echo "❌ Installation failed!"
+    echo "============================================="
+    echo ""
+
+    # Sanitize (remove API keys)
+    local sanitized=$(echo "$error_msg" | sed \
+        -e 's/ANTHROPIC_AUTH_TOKEN="[^"]*"/ANTHROPIC_AUTH_TOKEN="[REDACTED]"/g' \
+        -e 's/ZAI_API_KEY="[^"]*"/ZAI_API_KEY="[REDACTED]"/g')
+
+    echo "Error: $sanitized"
+    [ -n "$error_line" ] && echo "Location: $error_line"
+    echo ""
+
+    read -p "Report this error to GitHub? (y/n): " report_choice
+    if [ "$report_choice" != "y" ] && [ "$report_choice" != "Y" ]; then
+        echo "Get help at: https://github.com/aryan877/claude-proxy/issues"
+        return
+    fi
+
+    local issue_url="https://github.com/aryan877/claude-proxy/issues/new?labels=bug,unix,installation"
+
+    if command -v open &> /dev/null; then
+        open "$issue_url" 2>/dev/null
+    elif command -v xdg-open &> /dev/null; then
+        xdg-open "$issue_url" 2>/dev/null
     else
-        echo "⚠️  Claude Code not found in PATH"
-        echo ""
-        echo "Options:"
-        echo "1. If Claude Code is installed elsewhere, add it to PATH first"
-        echo "2. Install Claude Code from: https://www.anthropic.com/claude-code"
-        echo "3. Continue anyway (wrappers will be created but won't work until claude is available)"
-        echo ""
-        read -p "Continue with installation? (y/n): " continue_choice
-        if [[ "$continue_choice" != "y" && "$continue_choice" != "Y" ]]; then
-            echo "Installation cancelled."
-            exit 1
-        fi
-        return 1
+        echo "Open this URL to report: $issue_url"
     fi
 }
 
-# Main installation
+# ── Main ─────────────────────────────────────────────────────────────
+
 main() {
     echo "🔧 Claude Proxy Server-Friendly Installer"
     echo "=========================================="
@@ -787,14 +363,9 @@ main() {
     echo "  • Installs to: $USER_BIN_DIR"
     echo "  • Works on Unix/Linux servers"
     echo ""
-    
-    # Check Claude Code
-    check_claude_installation
-    
-    # Setup user bin directory
-    setup_user_bin
 
-    # Clean up old installations from different locations
+    check_claude_installation
+    setup_user_bin
     cleanup_old_wrappers
 
     # Check if already installed
@@ -805,67 +376,41 @@ main() {
         echo "2) Reinstall everything"
         echo "3) Cancel"
         read -p "Choice (1-3): " update_choice
-        
+
         case "$update_choice" in
             1)
                 read -p "Enter your Z.AI API key: " input_key
                 if [ -n "$input_key" ]; then
                     ZAI_API_KEY="$input_key"
-                    create_claude_glm_wrapper
-                    create_claude_glm_45_wrapper
-                    create_claude_glm_fast_wrapper
+                    create_wrapper "claude-glm"      "glm-5"     "glm-4.5-air" ".claude-glm"      "GLM-5 (Standard Model)" "🚀"
+                    create_wrapper "claude-glm-4.5"  "glm-4.5"   "glm-4.5-air" ".claude-glm-45"   "GLM-4.5"               "🚀"
+                    create_wrapper "claude-glm-fast"  "glm-4.5-air" "glm-4.5-air" ".claude-glm-fast" "GLM-4.5-Air (Fast)"  "⚡"
                     echo "✅ API key updated!"
                     exit 0
                 fi
                 ;;
-            2)
-                echo "Reinstalling..."
-                ;;
-            *)
-                exit 0
-                ;;
+            2) echo "Reinstalling..." ;;
+            *) exit 0 ;;
         esac
     fi
-    
+
     # Get API key
     echo ""
     echo "Enter your Z.AI API key (from https://z.ai/manage-apikey/apikey-list)"
     read -p "API Key: " input_key
-    
+
     if [ -n "$input_key" ]; then
         ZAI_API_KEY="$input_key"
         echo "✅ API key received (${#input_key} characters)"
     else
-        echo "⚠️  No API key provided. Add it manually later to:"
-        echo "   $USER_BIN_DIR/claude-glm"
-        echo "   $USER_BIN_DIR/claude-glm-4.5"
-        echo "   $USER_BIN_DIR/claude-glm-fast"
+        echo "⚠️  No API key provided. Add it manually later."
     fi
-    
-    # Create wrappers
-    create_claude_glm_wrapper
-    create_claude_glm_45_wrapper
-    create_claude_glm_fast_wrapper
+
+    # Create all wrappers using the single parameterized function
+    create_wrapper "claude-glm"      "glm-5"       "glm-4.5-air" ".claude-glm"      "GLM-5 (Standard Model)" "🚀"
+    create_wrapper "claude-glm-4.5"  "glm-4.5"     "glm-4.5-air" ".claude-glm-45"   "GLM-4.5"                "🚀"
+    create_wrapper "claude-glm-fast" "glm-4.5-air"  "glm-4.5-air" ".claude-glm-fast" "GLM-4.5-Air (Fast)"     "⚡"
     create_shell_aliases
-
-    # Ask about ccx installation
-    echo ""
-    echo "📦 Multi-Provider Proxy (ccx)"
-    echo "================================"
-    echo "ccx allows you to switch between multiple AI providers in a single session:"
-    echo "  • OpenAI (GPT-4, GPT-4o, etc.)"
-    echo "  • OpenRouter (access to many models)"
-    echo "  • Google Gemini"
-    echo "  • Z.AI GLM models"
-    echo "  • Anthropic Claude"
-    echo ""
-    read -p "Install ccx? (Y/n): " install_ccx_choice
-
-    if [ "$install_ccx_choice" != "n" ] && [ "$install_ccx_choice" != "N" ]; then
-        install_ccx
-        echo ""
-        echo "✅ ccx installed! Run 'ccx --setup' to configure API keys."
-    fi
 
     # Final instructions
     local rc_file=$(detect_shell_rc)
@@ -887,9 +432,6 @@ main() {
     echo "   claude-glm      - GLM-5 (latest)"
     echo "   claude-glm-4.5  - GLM-4.5"
     echo "   claude-glm-fast - GLM-4.5-Air (fast)"
-    if [ "$install_ccx_choice" != "n" ] && [ "$install_ccx_choice" != "N" ]; then
-        echo "   ccx             - Multi-provider proxy (switch models in-session)"
-    fi
     echo ""
     echo "Aliases:"
     echo "   cc          - claude (regular Claude)"
@@ -898,19 +440,15 @@ main() {
     echo "   ccf         - claude-glm-fast"
     echo "   claude-d    - claude --dangerously-skip-permissions"
     echo "   claude-glm-d - claude-glm --dangerously-skip-permissions"
-    if [ "$install_ccx_choice" != "n" ] && [ "$install_ccx_choice" != "N" ]; then
-        echo "   ccx   - Multi-provider proxy"
-    fi
     echo ""
-    
+    echo "📦 For multi-provider proxy (ccx, claude-codex, claude-gemini):"
+    echo "   npm install -g claude-proxy-ai"
+    echo ""
+
     if [ "$ZAI_API_KEY" = "YOUR_ZAI_API_KEY_HERE" ]; then
-        echo "⚠️  Don't forget to add your API key to:"
-        echo "   $USER_BIN_DIR/claude-glm"
-        echo "   $USER_BIN_DIR/claude-glm-4.5"
-        echo "   $USER_BIN_DIR/claude-glm-fast"
+        echo "⚠️  Don't forget to add your API key to the wrappers."
     fi
 
-    echo ""
     echo "📁 Installation location: $USER_BIN_DIR"
     echo "📁 Config directories: ~/.claude-glm, ~/.claude-glm-45, ~/.claude-glm-fast"
 }
@@ -921,59 +459,15 @@ handle_error() {
     local line_number=$1
     local bash_command="$2"
 
-    # Capture the error details
     local error_msg="Command failed with exit code $exit_code"
-    if [ -n "$bash_command" ]; then
-        error_msg="$error_msg: $bash_command"
-    fi
+    [ -n "$bash_command" ] && error_msg="$error_msg: $bash_command"
 
-    local error_location="Line $line_number in install.sh"
-
-    report_error "$error_msg" "$error_location" "$exit_code"
-
-    # Give user time to read any final messages before stopping
+    report_error "$error_msg" "Line $line_number in install.sh" "$exit_code"
     echo ""
     echo "Installation terminated due to error."
-    echo "Press Enter to finish (window will remain open)..."
-    read
-    # Return to stop script execution without closing terminal
-    return
 }
 
-# Test error functionality if requested
-if [ "$TEST_ERROR" = true ]; then
-    echo "🔍 TEST: Testing error reporting functionality..."
-    echo ""
-
-    # Show how script was invoked
-    if [ -n "$CLAUDE_GLM_TEST_ERROR" ]; then
-        echo "   (Invoked via environment variable)"
-    fi
-    echo ""
-
-    # Create a test error
-    local test_error_message="This is a test error to verify error reporting works correctly"
-    local test_error_line="Test mode - no actual error"
-
-    report_error "$test_error_message" "$test_error_line" "0"
-
-    echo "✅ Test complete. If a browser window opened, error reporting is working!"
-    echo ""
-    echo "To run normal installation, use:"
-    echo "   curl -fsSL https://raw.githubusercontent.com/aryan877/claude-proxy/main/install.sh | bash"
-    echo ""
-    echo "Press Enter to finish (window will remain open)..."
-    read
-    # Script ends naturally here - terminal stays open
-    exit 0
-fi
-
-# Set up error handling
-set -eE  # Exit on error, inherit ERR trap in functions
+# Set up error handling and run
+set -eE
 trap 'handle_error ${LINENO} "$BASH_COMMAND"' ERR
-
-# Only run installation if not in test mode
-if [ "$TEST_ERROR" != true ]; then
-    # Run installation
-    main "$@"
-fi
+main "$@"

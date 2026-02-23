@@ -38,9 +38,24 @@ No API key needed — uses Google OAuth with Code Assist API.
 claude-gemini
 ```
 
-### Option 3: `npx claude-proxy-ai` (GLM installer)
+### Option 3: `ccx` (Multi-provider proxy with API keys)
 
-For Z.AI GLM models with an API key:
+Use any provider via API keys — GLM, OpenAI, OpenRouter, Gemini, Anthropic.
+
+```bash
+# Install
+npm install -g claude-proxy-ai
+
+# Setup API keys
+ccx --setup
+
+# Run
+ccx
+```
+
+### Option 4: `npx claude-proxy-ai` (GLM installer)
+
+For Z.AI GLM models with an API key (creates shell wrapper scripts):
 
 ```bash
 npx claude-proxy-ai
@@ -56,10 +71,11 @@ This runs the interactive installer that sets up wrapper scripts and shell alias
 | `claude-codex-d` | GPT-5.3-Codex | Same, with `--dangerously-skip-permissions` |
 | `claude-gemini` | Gemini 3 Pro | Google OAuth |
 | `claude-gemini-d` | Gemini 3 Pro | Same, with `--dangerously-skip-permissions` |
-| `ccx` | Configurable | API keys in `.env` |
-| `ccg` / `claude-glm` | GLM-4.7 | Z.AI API key |
+| `ccx` | GLM-5 | API keys in `.env` (npm bin) |
+| `ccx-d` | GLM-5 | Same, with `--dangerously-skip-permissions` |
+| `ccg` / `claude-glm` | GLM-5 | Z.AI API key |
 | `ccf` | GLM-4.5-Air | Z.AI API key |
-| `claude-glm-d` | GLM-4.7 | Same, with `--dangerously-skip-permissions` |
+| `claude-glm-d` | GLM-5 | Same, with `--dangerously-skip-permissions` |
 | `cc` | Claude (native) | Anthropic subscription |
 | `claude-d` | Claude (native) | Same, with `--dangerously-skip-permissions` |
 
@@ -74,6 +90,12 @@ claude-codex --stop              # Stop the proxy
 claude-codex --status            # Show auth status
 claude-codex --logout            # Clear saved tokens
 claude-codex --proxy-status      # Show proxy status
+
+ccx --setup                      # Create ~/.claude-proxy/.env template
+ccx --status                     # Show configured API keys
+ccx --stop                       # Stop the proxy
+ccx --restart                    # Force restart
+ccx -d                           # Dangerously skip permissions
 ```
 
 ## Switching Models
@@ -270,8 +292,9 @@ Send images to models that support vision. The proxy passes base64 images to pro
 │       ├── openrouter.ts     # OpenRouter
 │       └── anthropic-pass.ts # Anthropic passthrough
 ├── bin/
-│   ├── claude-codex.js       # Codex launcher
-│   ├── claude-gemini.js      # Gemini launcher
+│   ├── ccx.js                # Multi-provider launcher (API key)
+│   ├── claude-codex.js       # Codex launcher (OAuth)
+│   ├── claude-gemini.js      # Gemini launcher (OAuth)
 │   └── lib/
 │       └── proxy-launcher.js # Proxy lifecycle management
 ├── google-oauth.json       # Google tokens (auto-generated)
