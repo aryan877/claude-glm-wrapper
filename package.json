@@ -1,6 +1,6 @@
 {
   "name": "claude-proxy-ai",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Cross-platform installer for Claude Code with Z.AI GLM models, multi-provider proxy, Gemini OAuth, Codex OAuth, and dangerously-skip-permissions shortcuts. Run with: npx claude-proxy-ai",
   "keywords": [
     "claude",

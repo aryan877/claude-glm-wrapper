@@ -114,10 +114,10 @@ export function parseProviderModel(
   if (expanded.toLowerCase().startsWith("claude-")) {
     if (defaults && defaults.provider !== "anthropic") {
       const lc = expanded.toLowerCase();
-      const isHaiku = lc.includes("haiku");
+      const isOpus = lc.includes("opus");
       const fast = PROVIDER_FAST_MODEL[defaults.provider];
       const main = PROVIDER_MAIN_MODEL[defaults.provider];
-      const remapped = isHaiku ? (fast || defaults.model) : (main || defaults.model);
+      const remapped = isOpus ? (main || defaults.model) : (fast || defaults.model);
       console.log(`[ccx] Remapping internal Claude model "${expanded}" → ${defaults.provider}:${remapped}`);
       return { provider: defaults.provider, model: remapped, reasoning };
     }
