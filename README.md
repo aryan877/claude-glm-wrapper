@@ -73,8 +73,7 @@ This runs the interactive installer that sets up wrapper scripts and shell alias
 | `claude-gemini-d` | Gemini 3 Pro | Same, with `--dangerously-skip-permissions` |
 | `ccx` | GLM-5 | API keys in `.env` (npm bin) |
 | `ccx-d` | GLM-5 | Same, with `--dangerously-skip-permissions` |
-| `ccg` / `claude-glm` | GLM-5 | Z.AI API key |
-| `ccf` | GLM-4.5-Air | Z.AI API key |
+| `ccg` / `claude-glm` | GLM-5 | Z.AI API key (via `npx claude-proxy-ai`) |
 | `claude-glm-d` | GLM-5 | Same, with `--dangerously-skip-permissions` |
 | `cc` | Claude (native) | Anthropic subscription |
 | `claude-d` | Claude (native) | Same, with `--dangerously-skip-permissions` |

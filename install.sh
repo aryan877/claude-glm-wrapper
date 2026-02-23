@@ -185,27 +185,24 @@ check_claude_installation() {
     fi
 }
 
-# ── Single parameterized wrapper creator ─────────────────────────────
+# ── Wrapper creator ──────────────────────────────────────────────────
 
-# create_wrapper <name> <model> <fast_model> <config_dir> <label> <emoji>
-create_wrapper() {
-    local name="$1"
-    local model="$2"
-    local fast_model="$3"
-    local config_dir="$4"
-    local label="$5"
-    local emoji="$6"
-    local wrapper_path="$USER_BIN_DIR/$name"
+# Creates the claude-glm wrapper script at $USER_BIN_DIR/claude-glm
+create_claude_glm_wrapper() {
+    local wrapper_path="$USER_BIN_DIR/claude-glm"
 
     cat > "$wrapper_path" << EOF
 #!/bin/bash
-# $name - Claude Code with Z.AI $label
+# claude-glm - Claude Code with Z.AI GLM-5
+#
+# Change ANTHROPIC_MODEL below to use a different model:
+#   glm-5, glm-4.5, glm-4.5-air, glm-4-flash
 
 export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
 export ANTHROPIC_AUTH_TOKEN="$ZAI_API_KEY"
-export ANTHROPIC_MODEL="$model"
-export ANTHROPIC_SMALL_FAST_MODEL="$fast_model"
-export CLAUDE_HOME="\$HOME/$config_dir"
+export ANTHROPIC_MODEL="glm-5"
+export ANTHROPIC_SMALL_FAST_MODEL="glm-4.5-air"
+export CLAUDE_HOME="\$HOME/.claude-glm"
 
 mkdir -p "\$CLAUDE_HOME"
 
@@ -214,14 +211,15 @@ cat > "\$CLAUDE_HOME/settings.json" << SETTINGS
   "env": {
     "ANTHROPIC_BASE_URL": "https://api.z.ai/api/anthropic",
     "ANTHROPIC_AUTH_TOKEN": "$ZAI_API_KEY",
-    "ANTHROPIC_MODEL": "$model",
-    "ANTHROPIC_SMALL_FAST_MODEL": "$fast_model"
+    "ANTHROPIC_MODEL": "glm-5",
+    "ANTHROPIC_SMALL_FAST_MODEL": "glm-4.5-air"
   }
 }
 SETTINGS
 
-echo "$emoji Starting Claude Code with $label..."
+echo "🚀 Starting Claude Code with GLM-5..."
 echo "📁 Config directory: \$CLAUDE_HOME"
+echo "💡 To change model, edit: $wrapper_path"
 echo ""
 
 if ! command -v claude &> /dev/null; then
@@ -234,7 +232,7 @@ claude "\$@"
 EOF
 
     chmod +x "$wrapper_path"
-    echo "✅ Installed $name at $wrapper_path"
+    echo "✅ Installed claude-glm at $wrapper_path"
 }
 
 # Create shell aliases
@@ -246,7 +244,7 @@ create_shell_aliases() {
         return
     fi
 
-    # Remove old aliases if they exist
+    # Remove old aliases if they exist (including legacy ccg45/ccf)
     if grep -q "# Claude Code Model Switcher Aliases" "$rc_file" 2>/dev/null; then
         grep -v "# Claude Code Model Switcher Aliases" "$rc_file" | \
         grep -v "alias cc=" | \
@@ -264,8 +262,6 @@ create_shell_aliases() {
 # Claude Code Model Switcher Aliases
 alias cc 'claude'
 alias ccg 'claude-glm'
-alias ccg45 'claude-glm-4.5'
-alias ccf 'claude-glm-fast'
 alias claude-d 'claude --dangerously-skip-permissions'
 alias claude-glm-d 'claude-glm --dangerously-skip-permissions'
 EOF
@@ -275,8 +271,6 @@ EOF
 # Claude Code Model Switcher Aliases
 alias cc='claude'
 alias ccg='claude-glm'
-alias ccg45='claude-glm-4.5'
-alias ccf='claude-glm-fast'
 alias claude-d='claude --dangerously-skip-permissions'
 alias claude-glm-d='claude-glm --dangerously-skip-permissions'
 EOF
@@ -341,7 +335,7 @@ main() {
     cleanup_old_wrappers
 
     # Check if already installed
-    if [ -f "$USER_BIN_DIR/claude-glm" ] || [ -f "$USER_BIN_DIR/claude-glm-fast" ]; then
+    if [ -f "$USER_BIN_DIR/claude-glm" ]; then
         echo ""
         echo "✅ Existing installation detected!"
         echo "1) Update API key only"
@@ -354,9 +348,7 @@ main() {
                 read -p "Enter your Z.AI API key: " input_key
                 if [ -n "$input_key" ]; then
                     ZAI_API_KEY="$input_key"
-                    create_wrapper "claude-glm"      "glm-5"     "glm-4.5-air" ".claude-glm"      "GLM-5 (Standard Model)" "🚀"
-                    create_wrapper "claude-glm-4.5"  "glm-4.5"   "glm-4.5-air" ".claude-glm-45"   "GLM-4.5"               "🚀"
-                    create_wrapper "claude-glm-fast"  "glm-4.5-air" "glm-4.5-air" ".claude-glm-fast" "GLM-4.5-Air (Fast)"  "⚡"
+                    create_claude_glm_wrapper
                     echo "✅ API key updated!"
                     exit 0
                 fi
@@ -378,10 +370,8 @@ main() {
         echo "⚠️  No API key provided. Add it manually later."
     fi
 
-    # Create all wrappers using the single parameterized function
-    create_wrapper "claude-glm"      "glm-5"       "glm-4.5-air" ".claude-glm"      "GLM-5 (Standard Model)" "🚀"
-    create_wrapper "claude-glm-4.5"  "glm-4.5"     "glm-4.5-air" ".claude-glm-45"   "GLM-4.5"                "🚀"
-    create_wrapper "claude-glm-fast" "glm-4.5-air"  "glm-4.5-air" ".claude-glm-fast" "GLM-4.5-Air (Fast)"     "⚡"
+    # Create wrapper and aliases
+    create_claude_glm_wrapper
     create_shell_aliases
 
     # Final instructions
@@ -401,28 +391,27 @@ main() {
     echo "📝 After sourcing, you can use:"
     echo ""
     echo "Commands:"
-    echo "   claude-glm      - GLM-5 (latest)"
-    echo "   claude-glm-4.5  - GLM-4.5"
-    echo "   claude-glm-fast - GLM-4.5-Air (fast)"
+    echo "   claude-glm      - Claude Code with GLM-5"
     echo ""
     echo "Aliases:"
     echo "   cc          - claude (regular Claude)"
     echo "   ccg         - claude-glm (GLM-5)"
-    echo "   ccg45       - claude-glm-4.5 (GLM-4.5)"
-    echo "   ccf         - claude-glm-fast"
     echo "   claude-d    - claude --dangerously-skip-permissions"
     echo "   claude-glm-d - claude-glm --dangerously-skip-permissions"
     echo ""
     echo "📦 For multi-provider proxy (ccx, claude-codex, claude-gemini):"
     echo "   npm install -g claude-proxy-ai"
     echo ""
+    echo "💡 To change model, edit: $USER_BIN_DIR/claude-glm"
+    echo "   Available: glm-5, glm-4.5, glm-4.5-air, glm-4-flash"
+    echo ""
 
     if [ "$ZAI_API_KEY" = "YOUR_ZAI_API_KEY_HERE" ]; then
-        echo "⚠️  Don't forget to add your API key to the wrappers."
+        echo "⚠️  Don't forget to add your API key to: $USER_BIN_DIR/claude-glm"
     fi
 
     echo "📁 Installation location: $USER_BIN_DIR"
-    echo "📁 Config directories: ~/.claude-glm, ~/.claude-glm-45, ~/.claude-glm-fast"
+    echo "📁 Config directory: ~/.claude-glm"
 }
 
 # Error handler

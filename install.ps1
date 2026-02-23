@@ -117,7 +117,7 @@ function Add-PowerShellAliases {
         try { $profileContent = Get-Content $PROFILE -ErrorAction Stop } catch { $profileContent = @() }
     }
 
-    # Remove old aliases
+    # Remove old aliases (including legacy ccg45/ccf)
     $filteredContent = $profileContent | Where-Object {
         $_ -notmatch "# Claude Code Model Switcher Aliases" -and
         $_ -notmatch "Set-Alias cc " -and
@@ -131,8 +131,6 @@ function Add-PowerShellAliases {
 # Claude Code Model Switcher Aliases
 Set-Alias cc claude
 Set-Alias ccg claude-glm
-Set-Alias ccg45 claude-glm-4.5
-Set-Alias ccf claude-glm-fast
 "@
 
     $newContent = $filteredContent + $aliases
@@ -140,44 +138,35 @@ Set-Alias ccf claude-glm-fast
     Write-Host "Added aliases to PowerShell profile: $PROFILE"
 }
 
-# ── Single parameterized wrapper creator ─────────────────────────────
+# ── Wrapper creator ──────────────────────────────────────────────────
 
-# New-ClaudeWrapper -Name <name> -Model <model> -FastModel <fast> -ConfigDir <dir> -Label <label> -Emoji <emoji>
-function New-ClaudeWrapper {
-    param(
-        [string]$Name,
-        [string]$Model,
-        [string]$FastModel,
-        [string]$ConfigDir,
-        [string]$Label,
-        [string]$Emoji
-    )
-
-    $wrapperPath = Join-Path $UserBinDir "$Name.ps1"
+# Creates the claude-glm.ps1 wrapper script
+function New-ClaudeGlmWrapper {
+    $wrapperPath = Join-Path $UserBinDir "claude-glm.ps1"
+    $configDir = "$env:USERPROFILE\.claude-glm"
 
     $wrapperContent = @(
-        "# $Name - Claude Code with Z.AI $Label",
+        '# claude-glm - Claude Code with Z.AI GLM-5',
+        '#',
+        '# Change ANTHROPIC_MODEL below to use a different model:',
+        '#   glm-5, glm-4.5, glm-4.5-air, glm-4-flash',
         '',
-        '# Set Z.AI environment variables',
         '$env:ANTHROPIC_BASE_URL = "https://api.z.ai/api/anthropic"',
         "`$env:ANTHROPIC_AUTH_TOKEN = `"$ZaiApiKey`"",
-        "`$env:ANTHROPIC_MODEL = `"$Model`"",
-        "`$env:ANTHROPIC_SMALL_FAST_MODEL = `"$FastModel`"",
+        '$env:ANTHROPIC_MODEL = "glm-5"',
+        '$env:ANTHROPIC_SMALL_FAST_MODEL = "glm-4.5-air"',
+        "`$env:CLAUDE_HOME = `"$configDir`"",
         '',
-        '# Use custom config directory',
-        "`$env:CLAUDE_HOME = `"$ConfigDir`"",
-        '',
-        '# Create config directory if needed',
         'if (-not (Test-Path $env:CLAUDE_HOME)) {',
         '    New-Item -ItemType Directory -Path $env:CLAUDE_HOME -Force | Out-Null',
         '}',
         '',
-        '# Create settings file',
-        "`$settingsJson = '{`"env`":{`"ANTHROPIC_BASE_URL`":`"https://api.z.ai/api/anthropic`",`"ANTHROPIC_AUTH_TOKEN`":`"$ZaiApiKey`",`"ANTHROPIC_MODEL`":`"$Model`",`"ANTHROPIC_SMALL_FAST_MODEL`":`"$FastModel`"}}'",
+        "`$settingsJson = '{`"env`":{`"ANTHROPIC_BASE_URL`":`"https://api.z.ai/api/anthropic`",`"ANTHROPIC_AUTH_TOKEN`":`"$ZaiApiKey`",`"ANTHROPIC_MODEL`":`"glm-5`",`"ANTHROPIC_SMALL_FAST_MODEL`":`"glm-4.5-air`"}}'",
         'Set-Content -Path (Join-Path $env:CLAUDE_HOME "settings.json") -Value $settingsJson',
         '',
-        "Write-Host `"$Emoji Starting Claude Code with $Label...`"",
+        'Write-Host "Starting Claude Code with GLM-5..."',
         'Write-Host "Config directory: $env:CLAUDE_HOME"',
+        "Write-Host `"To change model, edit: $wrapperPath`"",
         'Write-Host ""',
         '',
         'if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {',
@@ -190,7 +179,7 @@ function New-ClaudeWrapper {
     ) -join "`n"
 
     Set-Content -Path $wrapperPath -Value $wrapperContent
-    Write-Host "Installed $Name at $wrapperPath" -ForegroundColor Green
+    Write-Host "Installed claude-glm at $wrapperPath" -ForegroundColor Green
 }
 
 # ── Error reporting ──────────────────────────────────────────────────
@@ -243,9 +232,8 @@ function Install-ClaudeGlm {
 
     # Check if already installed
     $glmWrapper = Join-Path $UserBinDir "claude-glm.ps1"
-    $glmFastWrapper = Join-Path $UserBinDir "claude-glm-fast.ps1"
 
-    if ((Test-Path $glmWrapper) -or (Test-Path $glmFastWrapper)) {
+    if (Test-Path $glmWrapper) {
         Write-Host ""
         Write-Host "Existing installation detected!"
         Write-Host "1. Update API key only"
@@ -258,9 +246,7 @@ function Install-ClaudeGlm {
                 $inputKey = Read-Host "Enter your Z.AI API key"
                 if ($inputKey) {
                     $script:ZaiApiKey = $inputKey
-                    New-ClaudeWrapper -Name "claude-glm"      -Model "glm-5"       -FastModel "glm-4.5-air" -ConfigDir "$env:USERPROFILE\.claude-glm"      -Label "GLM-5 (Standard)"    -Emoji "LAUNCH:"
-                    New-ClaudeWrapper -Name "claude-glm-4.5"  -Model "glm-4.5"     -FastModel "glm-4.5-air" -ConfigDir "$env:USERPROFILE\.claude-glm-45"   -Label "GLM-4.5"             -Emoji "LAUNCH:"
-                    New-ClaudeWrapper -Name "claude-glm-fast" -Model "glm-4.5-air" -FastModel "glm-4.5-air" -ConfigDir "$env:USERPROFILE\.claude-glm-fast" -Label "GLM-4.5-Air (Fast)"  -Emoji "FAST:"
+                    New-ClaudeGlmWrapper
                     Write-Host "API key updated!"
                     exit 0
                 }
@@ -282,10 +268,8 @@ function Install-ClaudeGlm {
         Write-Host "No API key provided. Add it manually later."
     }
 
-    # Create all wrappers using the single parameterized function
-    New-ClaudeWrapper -Name "claude-glm"      -Model "glm-5"       -FastModel "glm-4.5-air" -ConfigDir "$env:USERPROFILE\.claude-glm"      -Label "GLM-5 (Standard)"    -Emoji "LAUNCH:"
-    New-ClaudeWrapper -Name "claude-glm-4.5"  -Model "glm-4.5"     -FastModel "glm-4.5-air" -ConfigDir "$env:USERPROFILE\.claude-glm-45"   -Label "GLM-4.5"             -Emoji "LAUNCH:"
-    New-ClaudeWrapper -Name "claude-glm-fast" -Model "glm-4.5-air" -FastModel "glm-4.5-air" -ConfigDir "$env:USERPROFILE\.claude-glm-fast" -Label "GLM-4.5-Air (Fast)"  -Emoji "FAST:"
+    # Create wrapper and aliases
+    New-ClaudeGlmWrapper
     Add-PowerShellAliases
 
     # Final instructions
@@ -301,26 +285,25 @@ function Install-ClaudeGlm {
     Write-Host "=========================================="
     Write-Host ""
     Write-Host "Commands:"
-    Write-Host "   claude-glm      - GLM-5 (latest)"
-    Write-Host "   claude-glm-4.5  - GLM-4.5"
-    Write-Host "   claude-glm-fast - GLM-4.5-Air (fast)"
+    Write-Host "   claude-glm  - Claude Code with GLM-5"
     Write-Host ""
     Write-Host "Aliases:"
-    Write-Host "   cc    - claude (regular Claude)"
-    Write-Host "   ccg   - claude-glm (GLM-5)"
-    Write-Host "   ccg45 - claude-glm-4.5 (GLM-4.5)"
-    Write-Host "   ccf   - claude-glm-fast"
+    Write-Host "   cc   - claude (regular Claude)"
+    Write-Host "   ccg  - claude-glm (GLM-5)"
     Write-Host ""
     Write-Host "For multi-provider proxy (ccx, claude-codex, claude-gemini):"
     Write-Host "   npm install -g claude-proxy-ai"
     Write-Host ""
+    Write-Host "To change model, edit: $UserBinDir\claude-glm.ps1"
+    Write-Host "   Available: glm-5, glm-4.5, glm-4.5-air, glm-4-flash"
+    Write-Host ""
 
     if ($ZaiApiKey -eq "YOUR_ZAI_API_KEY_HERE") {
-        Write-Host "Don't forget to add your API key to the wrappers."
+        Write-Host "Don't forget to add your API key to: $UserBinDir\claude-glm.ps1"
     }
 
     Write-Host "Installation location: $UserBinDir"
-    Write-Host "Config directories: ~/.claude-glm, ~/.claude-glm-45, ~/.claude-glm-fast"
+    Write-Host "Config directory: ~/.claude-glm"
 }
 
 # Run installation with error handling

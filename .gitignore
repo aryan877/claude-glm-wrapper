@@ -46,7 +46,6 @@ personal-*
 # Claude directories (should not be committed)
 .claude/
 .claude-glm/
-.claude-glm-fast/
 
 # Internal development documentation
 DEVELOPMENT.md
