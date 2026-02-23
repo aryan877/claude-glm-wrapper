@@ -237,34 +237,6 @@ EOF
     echo "✅ Installed $name at $wrapper_path"
 }
 
-# Create the Anthropic wrapper (no Z.AI env vars)
-create_claude_anthropic_wrapper() {
-    local wrapper_path="$USER_BIN_DIR/claude-anthropic"
-    cat > "$wrapper_path" << 'EOF'
-#!/bin/bash
-# Claude-Anthropic - Claude Code with original Anthropic models
-
-unset ANTHROPIC_BASE_URL
-unset ANTHROPIC_AUTH_TOKEN
-unset ANTHROPIC_MODEL
-unset ANTHROPIC_SMALL_FAST_MODEL
-unset CLAUDE_HOME
-
-echo "🚀 Starting Claude Code with Anthropic Claude models..."
-echo ""
-
-if ! command -v claude &> /dev/null; then
-    echo "❌ Error: 'claude' command not found!"
-    echo "Please ensure Claude Code is installed and in your PATH"
-    exit 1
-fi
-
-claude "$@"
-EOF
-    chmod +x "$wrapper_path"
-    echo "✅ Installed claude-anthropic at $wrapper_path"
-}
-
 # Create shell aliases
 create_shell_aliases() {
     local rc_file=$(detect_shell_rc)
