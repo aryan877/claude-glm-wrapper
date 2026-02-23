@@ -128,6 +128,76 @@ fastify.post("/google/logout", async () => {
   return { ok: true, message: "Logged out of Google" };
 });
 
+// ── Google Account 2 OAuth endpoints (failover account) ────────────────
+
+// Landing page for account 2
+fastify.get("/google/login/2", async (_req, reply) => {
+  reply.type("text/html").send(loginPage(PORT, 2));
+});
+
+// Start OAuth flow for account 2
+fastify.get("/google/login/2/start", async (_req, reply) => {
+  const authUrl = buildLoginUrl(PORT, 2);
+  reply.redirect(authUrl);
+});
+
+// OAuth callback for account 2
+fastify.get("/google/callback/2", async (req, reply) => {
+  const query = req.query as Record<string, string>;
+  const { code, state, error } = query;
+
+  if (error) {
+    return reply.type("text/html").code(400).send(
+      `<html><body style="font-family:system-ui;text-align:center;padding:60px;background:#0f172a;color:#e2e8f0;">
+        <h1 style="color:#f87171;">Login Failed</h1><p>${error}</p>
+        <a href="/google/login/2" style="color:#60a5fa;">Try again</a>
+      </body></html>`
+    );
+  }
+
+  if (!code || !state) {
+    return reply.type("text/html").code(400).send(
+      `<html><body style="font-family:system-ui;text-align:center;padding:60px;background:#0f172a;color:#e2e8f0;">
+        <h1 style="color:#f87171;">Missing Parameters</h1><p>No authorization code received.</p>
+        <a href="/google/login/2" style="color:#60a5fa;">Try again</a>
+      </body></html>`
+    );
+  }
+
+  try {
+    const tokens = await handleOAuthCallback(code, state, 2);
+    reply.type("text/html").send(
+      `<html><body style="font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#0f172a;">
+        <div style="text-align:center;color:#e2e8f0;max-width:500px;">
+          <div style="font-size:48px;">&#10003;</div>
+          <h1 style="color:#4ade80;">Failover Account Linked</h1>
+          <p>Account 2 logged in as: <strong>${tokens.email || "unknown"}</strong></p>
+          ${tokens.project_id ? `<p>Code Assist Project: <code style="background:#1e293b;padding:2px 8px;border-radius:4px;">${tokens.project_id}</code></p>` : `<p style="color:#94a3b8;">Using standard Generative Language API</p>`}
+          <p style="color:#64748b;margin-top:24px;">You can close this window.<br>This account will be used automatically when account 1 hits rate limits.</p>
+        </div>
+      </body></html>`
+    );
+  } catch (e: any) {
+    reply.type("text/html").code(500).send(
+      `<html><body style="font-family:system-ui;text-align:center;padding:60px;background:#0f172a;color:#e2e8f0;">
+        <h1 style="color:#f87171;">Login Failed</h1><p>${e.message}</p>
+        <a href="/google/login/2" style="color:#60a5fa;">Try again</a>
+      </body></html>`
+    );
+  }
+});
+
+// Account 2 login status
+fastify.get("/google/status/2", async () => {
+  return getLoginStatus(2);
+});
+
+// Account 2 logout
+fastify.post("/google/logout/2", async () => {
+  await googleLogout(2);
+  return { ok: true, message: "Logged out of Google account 2" };
+});
+
 // ── OpenAI/Codex OAuth endpoints ──────────────────────────────────────
 
 // Landing page with sign-in button
@@ -380,12 +450,20 @@ fastify
       console.log(`[ccx] Default provider: ${active.provider}:${active.model}`);
     }
 
-    // Show Google login status
+    // Show Google login status (account 1)
     const gStatus = await getLoginStatus();
     if (gStatus.loggedIn) {
-      console.log(`[ccx] Google: logged in as ${gStatus.email || "unknown"} (${gStatus.mode})`);
+      console.log(`[ccx] Google acct1: logged in as ${gStatus.email || "unknown"} (${gStatus.mode})`);
     } else {
-      console.log(`[ccx] Google: not logged in. Visit http://127.0.0.1:${PORT}/google/login to authenticate`);
+      console.log(`[ccx] Google acct1: not logged in. Visit http://127.0.0.1:${PORT}/google/login to authenticate`);
+    }
+
+    // Show Google account 2 status (failover account)
+    const g2Status = await getLoginStatus(2);
+    if (g2Status.loggedIn) {
+      console.log(`[ccx] Google acct2: logged in as ${g2Status.email || "unknown"} (${g2Status.mode})`);
+    } else {
+      console.log(`[ccx] Google acct2: not linked. Visit http://127.0.0.1:${PORT}/google/login/2 to add failover account`);
     }
 
     // Show Codex/OpenAI login status

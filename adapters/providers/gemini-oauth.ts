@@ -183,12 +183,22 @@ async function _chatGeminiOAuthInner(
   body: AnthropicRequest,
   model: string,
   apiKey?: string,
-  reasoning?: ReasoningLevel
+  reasoning?: ReasoningLevel,
+  accountHint = 1
 ) {
   // If API key provided, use it directly (no OAuth needed)
   // Otherwise use OAuth access token (auto-refreshes if expired)
-  const accessToken = apiKey || await getAccessToken();
-  const tokens = apiKey ? null : await loadTokens();
+  let accessToken: string;
+  let tokens: import("../google-auth.js").GoogleTokens | null;
+
+  if (apiKey) {
+    accessToken = apiKey;
+    tokens = null;
+  } else {
+    tokens = await loadTokens(accountHint);
+    accessToken = await getAccessToken(accountHint);
+  }
+
   const projectId = tokens?.project_id;
 
   // Build Gemini request
@@ -334,6 +344,16 @@ async function _chatGeminiOAuthInner(
   if (!resp.ok || !resp.body) {
     const text = await safeText(resp);
     console.error(`[gemini-oauth] API error ${resp.status}: ${text}`);
+
+    // 429 failover: if account 1 hits rate limit, retry with account 2
+    if (resp.status === 429 && !apiKey && accountHint === 1) {
+      const acct2 = await loadTokens(2);
+      if (acct2) {
+        console.log("[gemini-oauth] Account 1 hit 429, retrying with account 2...");
+        return _chatGeminiOAuthInner(res, body, model, undefined, reasoning, 2);
+      }
+    }
+
     throw new Error(`Gemini API returned ${resp.status}: ${text.slice(0, 300)}`);
   }
 

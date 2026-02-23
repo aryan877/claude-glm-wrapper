@@ -32,7 +32,10 @@ const CA_VERSION = "v1internal";
 // ── Storage ────────────────────────────────────────────────────────────
 
 const PROXY_DIR = join(homedir(), ".claude-proxy");
-const AUTH_FILE = join(PROXY_DIR, "google-oauth.json");
+
+function authFile(account: number): string {
+  return join(PROXY_DIR, account === 1 ? "google-oauth.json" : `google-oauth-${account}.json`);
+}
 
 export interface GoogleTokens {
   access_token: string;
@@ -42,9 +45,9 @@ export interface GoogleTokens {
   project_id?: string;
 }
 
-export async function loadTokens(): Promise<GoogleTokens | null> {
+export async function loadTokens(account = 1): Promise<GoogleTokens | null> {
   try {
-    const data = await readFile(AUTH_FILE, "utf-8");
+    const data = await readFile(authFile(account), "utf-8");
     const parsed = JSON.parse(data);
     if (!parsed.access_token || !parsed.refresh_token) return null;
     return parsed as GoogleTokens;
@@ -53,9 +56,14 @@ export async function loadTokens(): Promise<GoogleTokens | null> {
   }
 }
 
-async function saveTokens(tokens: GoogleTokens): Promise<void> {
+/** Alias for loadTokens - used by gemini-oauth for failover */
+export async function getTokensForAccount(account: number): Promise<GoogleTokens | null> {
+  return loadTokens(account);
+}
+
+async function saveTokens(tokens: GoogleTokens, account = 1): Promise<void> {
   await mkdir(PROXY_DIR, { recursive: true });
-  await writeFile(AUTH_FILE, JSON.stringify(tokens, null, 2), { mode: 0o600 });
+  await writeFile(authFile(account), JSON.stringify(tokens, null, 2), { mode: 0o600 });
 }
 
 // ── PKCE helpers ───────────────────────────────────────────────────────
@@ -94,28 +102,29 @@ async function refreshAccessToken(
 }
 
 /** Get a valid access token, auto-refreshing if needed */
-export async function getAccessToken(): Promise<string> {
-  const tokens = await loadTokens();
+export async function getAccessToken(account = 1): Promise<string> {
+  const tokens = await loadTokens(account);
   if (!tokens) {
+    const loginPath = account === 1 ? "/google/login" : `/google/login/${account}`;
     throw new Error(
-      "Not logged in to Google. Visit http://127.0.0.1:" +
+      `Not logged in to Google (account ${account}). Visit http://127.0.0.1:` +
         (process.env.CLAUDE_PROXY_PORT || "17870") +
-        "/google/login to authenticate."
+        `${loginPath} to authenticate.`
     );
   }
 
   // Refresh if expired or within 5-minute buffer
   if (Date.now() > tokens.expires_at - 5 * 60 * 1000) {
-    console.log("[gemini-oauth] Access token expired, refreshing...");
+    console.log(`[gemini-oauth] Access token expired (account ${account}), refreshing...`);
     try {
       const refreshed = await refreshAccessToken(tokens.refresh_token);
       tokens.access_token = refreshed.access_token;
       tokens.expires_at = Date.now() + refreshed.expires_in * 1000;
-      await saveTokens(tokens);
-      console.log("[gemini-oauth] Token refreshed successfully");
+      await saveTokens(tokens, account);
+      console.log(`[gemini-oauth] Token refreshed successfully (account ${account})`);
     } catch (e: any) {
       throw new Error(
-        `Token refresh failed: ${e.message}. Please re-login at /google/login`
+        `Token refresh failed (account ${account}): ${e.message}. Please re-login at /google/login${account === 1 ? "" : `/${account}`}`
       );
     }
   }
@@ -436,20 +445,17 @@ export async function googleLoginStandalone(): Promise<GoogleTokens> {
 
 // ── Proxy-integrated login (via Fastify routes) ────────────────────────
 
-// In-memory pending OAuth state for proxy-integrated login
-let pendingOAuth: {
-  state: string;
-  verifier: string;
-  redirectUri: string;
-} | null = null;
+// In-memory pending OAuth state for proxy-integrated login (keyed by account number)
+const pendingOAuthMap = new Map<number, { state: string; verifier: string; redirectUri: string }>();
 
 /** Build the Google OAuth authorization URL (for proxy-integrated login) */
-export function buildLoginUrl(proxyPort: number): string {
-  const redirectUri = `http://127.0.0.1:${proxyPort}/google/callback`;
+export function buildLoginUrl(proxyPort: number, account = 1): string {
+  const callbackPath = account === 1 ? "/google/callback" : `/google/callback/${account}`;
+  const redirectUri = `http://127.0.0.1:${proxyPort}${callbackPath}`;
   const state = crypto.randomBytes(32).toString("hex");
   const { verifier, challenge } = generatePKCE();
 
-  pendingOAuth = { state, verifier, redirectUri };
+  pendingOAuthMap.set(account, { state, verifier, redirectUri });
 
   const params = new URLSearchParams({
     client_id: OAUTH_CLIENT_ID,
@@ -469,19 +475,22 @@ export function buildLoginUrl(proxyPort: number): string {
 /** Handle OAuth callback (for proxy-integrated login) */
 export async function handleOAuthCallback(
   code: string,
-  state: string
+  state: string,
+  account = 1
 ): Promise<GoogleTokens> {
-  if (!pendingOAuth) {
-    throw new Error("No pending OAuth flow. Visit /google/login first.");
+  const pending = pendingOAuthMap.get(account);
+  if (!pending) {
+    const loginPath = account === 1 ? "/google/login" : `/google/login/${account}`;
+    throw new Error(`No pending OAuth flow for account ${account}. Visit ${loginPath} first.`);
   }
 
-  if (state !== pendingOAuth.state) {
-    pendingOAuth = null;
+  if (state !== pending.state) {
+    pendingOAuthMap.delete(account);
     throw new Error("OAuth state mismatch - possible CSRF attack.");
   }
 
-  const { verifier, redirectUri } = pendingOAuth;
-  pendingOAuth = null;
+  const { verifier, redirectUri } = pending;
+  pendingOAuthMap.delete(account);
 
   // Exchange code for tokens
   const tokenResp = await fetch(TOKEN_ENDPOINT, {
@@ -517,24 +526,24 @@ export async function handleOAuthCallback(
   tokens.project_id = await setupCodeAssist(tokens.access_token);
 
   // Save
-  await saveTokens(tokens);
+  await saveTokens(tokens, account);
 
   console.log(
-    `[gemini-oauth] Login successful! Email: ${tokens.email || "unknown"}, Project: ${tokens.project_id || "none (using standard API)"}`
+    `[gemini-oauth] Login successful (account ${account})! Email: ${tokens.email || "unknown"}, Project: ${tokens.project_id || "none (using standard API)"}`
   );
 
   return tokens;
 }
 
 /** Get login status */
-export async function getLoginStatus(): Promise<{
+export async function getLoginStatus(account = 1): Promise<{
   loggedIn: boolean;
   email?: string;
   projectId?: string;
   expiresAt?: number;
   mode?: string;
 }> {
-  const tokens = await loadTokens();
+  const tokens = await loadTokens(account);
   if (!tokens) return { loggedIn: false };
   return {
     loggedIn: true,
@@ -546,13 +555,13 @@ export async function getLoginStatus(): Promise<{
 }
 
 /** Logout */
-export async function googleLogout(): Promise<void> {
+export async function googleLogout(account = 1): Promise<void> {
   try {
     const { unlink } = await import("fs/promises");
-    await unlink(AUTH_FILE);
-    console.log("[gemini-oauth] Logged out, credentials removed.");
+    await unlink(authFile(account));
+    console.log(`[gemini-oauth] Logged out (account ${account}), credentials removed.`);
   } catch {
-    console.log("[gemini-oauth] Already logged out.");
+    console.log(`[gemini-oauth] Already logged out (account ${account}).`);
   }
 }
 
@@ -585,15 +594,20 @@ function errorPage(message: string): string {
 </body></html>`;
 }
 
-export function loginPage(_proxyPort: number): string {
+export function loginPage(_proxyPort: number, account = 1): string {
+  const startPath = account === 1 ? "/google/login/start" : `/google/login/${account}/start`;
+  const title = account === 1 ? "Google Login for Gemini" : `Google Login for Gemini (Account ${account} — Failover)`;
+  const subtitle = account === 1
+    ? "Click the button below to authenticate with your Google account."
+    : `Click the button below to authenticate a second Google account. This account will be used automatically when account 1 hits rate limits (429).`;
   return `<!DOCTYPE html>
 <html><head><title>Google Login</title></head>
 <body style="font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#0f172a;">
 <div style="text-align:center;color:#e2e8f0;max-width:500px;">
-  <h1 style="margin:0 0 12px;">Google Login for Gemini</h1>
-  <p style="color:#94a3b8;">Click the button below to authenticate with your Google account.</p>
+  <h1 style="margin:0 0 12px;">${title}</h1>
+  <p style="color:#94a3b8;">${subtitle}</p>
   <p style="color:#94a3b8;">This uses the same OAuth flow as the official Gemini CLI.</p>
-  <a href="/google/login/start" style="display:inline-block;margin-top:24px;padding:12px 32px;background:#4285f4;color:white;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;">
+  <a href="${startPath}" style="display:inline-block;margin-top:24px;padding:12px 32px;background:#4285f4;color:white;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;">
     Sign in with Google
   </a>
   <p style="color:#475569;margin-top:32px;font-size:14px;">Scopes: cloud-platform, userinfo.email, userinfo.profile</p>
