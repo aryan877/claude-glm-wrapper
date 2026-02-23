@@ -59,6 +59,25 @@ const MODEL_SHORTCUTS: Record<string, string> = {
   cx52: "codex-oauth:gpt-5.2-codex",
 };
 
+// When Claude Code internally sends claude-haiku-*/claude-sonnet-* requests
+// (Explore subagent, title gen, quota checks), remap to the active provider's
+// equivalent so it doesn't fail when Anthropic keys aren't configured.
+const PROVIDER_FAST_MODEL: Partial<Record<ProviderKey, string>> = {
+  "codex-oauth": "gpt-5.1-codex-mini",
+  "gemini-oauth": "gemini-3-flash-preview",
+  "openai": "gpt-5-mini",
+  "openrouter": "anthropic/claude-haiku-4-5",
+  "glm": "glm-4.5-air",
+};
+
+const PROVIDER_MAIN_MODEL: Partial<Record<ProviderKey, string>> = {
+  "codex-oauth": "gpt-5.3-codex",
+  "gemini-oauth": "gemini-3-pro-preview",
+  "openai": "gpt-5.3",
+  "openrouter": "anthropic/claude-sonnet-4-6",
+  "glm": "glm-5",
+};
+
 /**
  * Parse provider and model from the model field
  * Supports formats: "provider:model" or "provider/model"
@@ -88,8 +107,20 @@ export function parseProviderModel(
   // Expand shortcuts first
   const expanded = MODEL_SHORTCUTS[rawField.toLowerCase()] || rawField;
 
-  // Auto-detect Claude models (start with "claude-") and route to anthropic
+  // Auto-detect Claude models (start with "claude-") → route to anthropic,
+  // OR remap to the active provider's equivalent when not using anthropic.
+  // This handles Claude Code's internal haiku/sonnet calls (Explore subagent,
+  // title generation, quota checks) that would otherwise fail through the proxy.
   if (expanded.toLowerCase().startsWith("claude-")) {
+    if (defaults && defaults.provider !== "anthropic") {
+      const lc = expanded.toLowerCase();
+      const isHaiku = lc.includes("haiku");
+      const fast = PROVIDER_FAST_MODEL[defaults.provider];
+      const main = PROVIDER_MAIN_MODEL[defaults.provider];
+      const remapped = isHaiku ? (fast || defaults.model) : (main || defaults.model);
+      console.log(`[ccx] Remapping internal Claude model "${expanded}" → ${defaults.provider}:${remapped}`);
+      return { provider: defaults.provider, model: remapped, reasoning };
+    }
     return { provider: "anthropic", model: expanded, reasoning };
   }
 
