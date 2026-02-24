@@ -436,12 +436,26 @@ async function _chatGeminiOAuthInner(
 
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
+
+  // Track SSE-level errors (Code Assist returns HTTP 200 but embeds errors in the stream)
+  let streamError: { status: number; message: string } | null = null;
+
   const parser = createParser({
     onEvent(event: EventSourceMessage) {
       const data = event.data;
       if (!data) return;
       try {
         const json = JSON.parse(data);
+
+        // Detect errors embedded in the SSE stream (Code Assist API returns HTTP 200
+        // even for rate-limit/quota errors, with the error inside the stream body)
+        const errorObj = json.error || json?.[0]?.error || json?.response?.error;
+        if (errorObj?.code) {
+          if (!hasStartedMessage) {
+            streamError = { status: errorObj.code, message: JSON.stringify(json) };
+          }
+          return;
+        }
 
         // Handle both Code Assist (wrapped) and standard API (unwrapped) responses
         const candidateData = json.response || json;
@@ -487,6 +501,21 @@ async function _chatGeminiOAuthInner(
     const { value, done } = await reader.read();
     if (done) break;
     parser.feed(decoder.decode(value, { stream: true }));
+    // Early exit if we detected a stream-level error before any content
+    if (streamError && !hasStartedMessage) break;
+  }
+
+  // Handle errors that came through the SSE stream (HTTP 200 but error in body)
+  if (streamError && !hasStartedMessage) {
+    console.error(`[gemini-oauth] Stream error ${streamError.status}: ${streamError.message.slice(0, 200)}`);
+    if (streamError.status === 429 && !apiKey && accountHint === 1) {
+      const acct2 = await loadTokens(2);
+      if (acct2) {
+        console.log("[gemini-oauth] Account 1 hit 429 (stream), retrying with account 2...");
+        return _chatGeminiOAuthInner(res, body, model, undefined, reasoning, 2);
+      }
+    }
+    throw new Error(`Gemini API returned ${streamError.status}: ${streamError.message.slice(0, 300)}`);
   }
 
   // ── Finalize: close blocks and emit tool_use if any ──────────────────
