@@ -75,8 +75,8 @@ async function main() {
   console.log("    gemini         gemini-3-pro-preview      (default)");
   console.log("    gemini-pro     gemini-3-pro-preview");
   console.log("    gemini-flash   gemini-3-flash-preview");
-  console.log("    gemini-31p     gemini-3.1-pro-preview    (standard API only)");
-  console.log("    gemini-31f     gemini-3.1-flash-preview  (standard API only)");
+  console.log("    gemini-31p     gemini-3.1-pro-preview");
+  console.log("    gemini-31f     gemini-3.1-flash-preview");
   console.log("    gemini-25p     gemini-2.5-pro");
   console.log("    gemini-25f     gemini-2.5-flash");
   console.log("");
