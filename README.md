@@ -113,14 +113,15 @@ Instead of typing `provider:full-model-name`, use shortcuts:
 /model codex-mini     → gpt-5.1-codex-mini
 /model cx             → gpt-5.3-codex (short alias)
 
-/model gemini         → gemini-3-pro-preview (default Gemini)
-/model gemini-pro     → gemini-3-pro-preview
+/model gemini         → gemini-3.1-pro-preview (default Gemini)
+/model gemini-pro     → gemini-3.1-pro-preview
 /model gemini-flash   → gemini-3-flash-preview
-/model gemini-31p     → gemini-3.1-pro-preview (standard API only)
-/model gemini-31f     → gemini-3.1-flash-preview (standard API only)
+/model gemini-3p      → gemini-3-pro-preview
+/model gemini-31p     → gemini-3.1-pro-preview
+/model gemini-31f     → gemini-3.1-flash-preview
 /model gemini-25p     → gemini-2.5-pro
 /model gemini-25f     → gemini-2.5-flash
-/model gp             → gemini-3-pro-preview (short alias)
+/model gp             → gemini-3.1-pro-preview (short alias)
 /model gf             → gemini-3-flash-preview (short alias)
 
 /model glm            → glm-5
@@ -230,6 +231,17 @@ claude-gemini
 # On first run, visit: http://127.0.0.1:17870/google/login
 ```
 
+**429 Failover — Link a second Google account:**
+
+If account 1 hits a rate limit, the proxy automatically retries with account 2:
+
+```bash
+# Visit while proxy is running
+open http://127.0.0.1:17870/google/login/2
+```
+
+Tokens are stored in `~/.claude-proxy/google-oauth-2.json`. The proxy logs both account statuses at startup.
+
 ### API Keys (GLM, OpenRouter, Anthropic)
 
 For providers that use API keys, configure `~/.claude-proxy/.env`:
@@ -265,7 +277,7 @@ All reasoning-capable models stream their thinking process:
 |----------|-------------------|
 | Codex (GPT-5.x) | `reasoning.effort`: low/medium/high/xhigh |
 | Gemini 3 Pro | `thinkingLevel`: LOW/HIGH only (medium → HIGH) |
-| Gemini 3.1 Pro, 3 Flash | `thinkingLevel`: LOW/MEDIUM/HIGH |
+| Gemini 3.1 Pro, 3 Flash, 3.1 Flash | `thinkingLevel`: LOW/MEDIUM/HIGH |
 | Gemini 2.5 | `thinkingBudget`: token count |
 
 Thinking tokens appear as `thinking` blocks in Claude Code, just like native Claude extended thinking.

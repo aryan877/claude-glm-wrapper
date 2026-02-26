@@ -38,14 +38,15 @@ const MODEL_SHORTCUTS: Record<string, string> = {
   sonnet: "anthropic:claude-sonnet-4-5-20250929",
   haiku: "anthropic:claude-haiku-4-5-20251001",
   // Gemini OAuth shortcuts (Google account login)
-  gemini: "gemini-oauth:gemini-3-pro-preview",
-  "gemini-pro": "gemini-oauth:gemini-3-pro-preview",
+  gemini: "gemini-oauth:gemini-3.1-pro-preview",
+  "gemini-pro": "gemini-oauth:gemini-3.1-pro-preview",
   "gemini-flash": "gemini-oauth:gemini-3-flash-preview",
+  "gemini-3p": "gemini-oauth:gemini-3-pro-preview",
   "gemini-31p": "gemini-oauth:gemini-3.1-pro-preview",
   "gemini-31f": "gemini-oauth:gemini-3.1-flash-preview",
   "gemini-25p": "gemini-oauth:gemini-2.5-pro",
   "gemini-25f": "gemini-oauth:gemini-2.5-flash",
-  gp: "gemini-oauth:gemini-3-pro-preview",
+  gp: "gemini-oauth:gemini-3.1-pro-preview",
   gf: "gemini-oauth:gemini-3-flash-preview",
   // Codex OAuth shortcuts (OpenAI ChatGPT Plus subscription)
   codex: "codex-oauth:gpt-5.3-codex",
@@ -72,7 +73,7 @@ const PROVIDER_FAST_MODEL: Partial<Record<ProviderKey, string>> = {
 
 const PROVIDER_MAIN_MODEL: Partial<Record<ProviderKey, string>> = {
   "codex-oauth": "gpt-5.3-codex",
-  "gemini-oauth": "gemini-3-pro-preview",
+  "gemini-oauth": "gemini-3.1-pro-preview",
   "openai": "gpt-5.3",
   "openrouter": "anthropic/claude-sonnet-4-6",
   "glm": "glm-5",

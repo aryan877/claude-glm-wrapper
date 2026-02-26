@@ -72,9 +72,10 @@ async function main() {
   // Available models
   console.log("  Models (use with /model):");
   console.log("  ─────────────────────────────────────────────");
-  console.log("    gemini         gemini-3-pro-preview      (default)");
-  console.log("    gemini-pro     gemini-3-pro-preview");
+  console.log("    gemini         gemini-3.1-pro-preview    (default)");
+  console.log("    gemini-pro     gemini-3.1-pro-preview");
   console.log("    gemini-flash   gemini-3-flash-preview");
+  console.log("    gemini-3p      gemini-3-pro-preview");
   console.log("    gemini-31p     gemini-3.1-pro-preview");
   console.log("    gemini-31f     gemini-3.1-flash-preview");
   console.log("    gemini-25p     gemini-2.5-pro");
@@ -104,7 +105,7 @@ async function main() {
   await launchProxy({
     rootDir,
     provider: "gemini-oauth",
-    model: "gemini-3-pro-preview",
+    model: "gemini-3.1-pro-preview",
     defaultModel: "gemini",
     startedBy: "claude-gemini",
     forceRestart: args.includes("--restart"),
